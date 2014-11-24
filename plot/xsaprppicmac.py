@@ -117,21 +117,24 @@ def multipanel(source, output, stamp, sweeps, dpi=100, verbose=False):
         fig.savefig(filename, format='png', dpi=dpi, bbox_inches='tight')
         plt.close(fig)
 
+    return
+
 
 if __name__ == '__main__':
     description = 'Plot multiple X-band PPI files'
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('--source', type=str, required=True, help=None)
-    parser.add_argument('--output', type=str, required=True, help=None)
-    parser.add_argument('--stamp', type=str, required=True, help=None)
+    parser.add_argument('source', type=str, help=None)
+    parser.add_argument('output', type=str, help=None)
+    parser.add_argument('stamp', type=str, help=None)
     parser.add_argument('--sweeps', nargs='?', const=[0, 2, 5, 8, 13, 17, 21],
                         type=list, help=None)
-    parser.add_argument('-v', '--verbose', nargs='?', const=True, type=bool,
+    parser.add_argument('--dpi', nargs='?', const=50, type=int, help=None)
+    parser.add_argument('-v', '--verbose', nargs='?', const=False, type=bool,
                         help=None)
     args = parser.parse_args()
 
     # Call desired plotting function
-    multipanel(args.source, args.output, args.stamp, args.sweeps, dpi=200,
+    multipanel(args.source, args.output, args.stamp, args.sweeps, dpi=args.dpi,
                verbose=args.verbose)

@@ -13,7 +13,6 @@ from pyart.graph import cm
 
 
 # Set figure parameters
-# Axes line and tick sizes
 rcParams['axes.linewidth'] = 1.5
 rcParams['xtick.major.size'] = 4
 rcParams['xtick.major.width'] = 1
@@ -29,7 +28,7 @@ cmap_refl = cm.NWSRef
 cmap_vdop = plt.get_cmap(name='jet')
 cmap_ncp = plt.get_cmap(name='jet')
 cmap_rhv = plt.get_cmap(name='jet')
-norm_refl = colors.BoundaryNorm(np.arange(-8, 65, 2), cmap_refl.N)
+norm_refl = colors.BoundaryNorm(np.arange(-8, 66, 2), cmap_refl.N)
 norm_vdop = colors.BoundaryNorm(np.arange(-30, 32, 2), cmap_vdop.N)
 norm_ncp = colors.BoundaryNorm(np.arange(0, 1.1, 0.1), cmap_ncp.N)
 norm_rhv = colors.BoundaryNorm(np.arange(0, 1.1, 0.1), cmap_rhv.N)
@@ -72,7 +71,7 @@ def multipanel(source, output, stamp, heights, dpi=100, verbose=False):
 
     for f in files:
         if verbose:
-            print 'Currently plotting file %s' % os.path.basename(f)
+            print 'Plotting file %s' % os.path.basename(f)
 
         # Parse input file
         grid = Dataset(f, mode='r')
@@ -137,10 +136,11 @@ if __name__ == '__main__':
     parser.add_argument('output', type=str, help=None)
     parser.add_argument('stamp', type=str, help=None)
     parser.add_argument('--heights', nargs='?', const=[0, 8, 16, 24, 32, 40],
-                        type=list, help=None)
-    parser.add_argument('--dpi', nargs='?', const=50, type=int, help=None)
-    parser.add_argument('-v', '--verbose', nargs='?', const=True, type=bool,
+                        default=[0, 8, 16, 24, 32, 40], type=list, help=None)
+    parser.add_argument('--dpi', nargs='?', const=50, default=50, type=int,
                         help=None)
+    parser.add_argument('-v', '--verbose', nargs='?', const=True,
+                        default=False, type=bool, help=None)
     args = parser.parse_args()
 
     # Call desired plotting function
