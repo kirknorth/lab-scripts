@@ -122,7 +122,7 @@ if __name__ = '__main__':
 
     for fcmac in files:
         if args.verbose:
-            print 'Currently processing file %s' % fcmac
+            print 'Processing file %s' % fcmac
 
         process(fcmac, grid_coords, args.Fn, args.dl, args.facility_id,
                 grid_origin=grid_origin, fields=fields)
