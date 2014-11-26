@@ -2,6 +2,7 @@
 
 import os
 import argparse
+import json
 import numpy as np
 
 from re import search
@@ -35,6 +36,7 @@ def group_by_lag(files, times, stamps, lag=240, verbose=False):
     """
     """
 
+    # Compute time offset from first grid time
     tdeltas = [time - times[0] for time in times]
     data = [[f, td] for f, td in zip(files, tdeltas)]
     group_key = lambda (f, td): td.total_seconds() // lag
@@ -45,6 +47,9 @@ def group_by_lag(files, times, stamps, lag=240, verbose=False):
 
     # Remove groups with only one radar grid
     groups = [group for group in groups if len(group) > 1]
+
+    # Remove timedelta information from groups
+    groups = [[grid[0] for grid in group] for group in groups]
 
     if verbose:
         print ('Total number of grid groups within {} sec of '
@@ -65,12 +70,14 @@ if __name__ == '__main__':
                         default=False, help=None)
     args = parser.parse_args()
 
-    print args.sources
-    print args.stamps
-
     # First sort all files by time in ascending order
     files, times = sort_by_time(args.sources, args.stamps, suffix='cdf',
                                 verbose=args.verbose)
 
     # Group files by lag
-    group_by_lag(files, times, args.stamps, lag=args.lag, verbose=args.verbose)
+    groups = group_by_lag(files, times, args.stamps, lag=args.lag,
+                          verbose=args.verbose)
+
+    # Save grouped grids to a JSON file
+    with open(args.output, 'w') as fid:
+        json.dump(groups, fid, indent=2)
