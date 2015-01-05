@@ -3,6 +3,7 @@
 import os
 import platform
 import getpass
+import argparse
 import numpy as np
 
 from datetime import datetime
@@ -13,19 +14,21 @@ from pyart.config import get_fillvalue
 from pyart.map.grid_test import map_radar_to_grid
 
 
+### GLOBAL VARIABLES ###
+########################
+
 # Define fields to process
-fields = ['corrected_reflectivity', 'corrected_velocity',
+FIELDS = ['corrected_reflectivity', 'corrected_velocity',
           'normalized_coherent_power', 'cross_correlation_ratio']
 
-
 # Define grid coordinates and origin
-grid_coords = [np.arange(0, 10250, 250),
-               np.arange(-50000, 50500, 500),
-               np.arange(-50000, 50500, 500)]
-grid_origin = [36.605, -97.485]
+COORDS = [np.arange(0, 10250, 250),
+          np.arange(-50000, 50500, 500),
+          np.arange(-50000, 50500, 500)]
+ORIGIN = [36.605, -97.485]
 
 
-def parse_datastreams(files, process_version='-9999'):
+def parse_datastreams(files, version='-9999'):
     """
     """
     streams = []
@@ -33,9 +36,56 @@ def parse_datastreams(files, process_version='-9999'):
         fsplit = os.path.basename(f).split('.')
         stream = '.'.join(fsplit[:2])
         date = '.'.join(fsplit[2:4])
-        streams.append('{} : {} : {}'.format(stream, process_version, date))
+        streams.append('{} : {} : {}'.format(stream, version, date))
 
-    return ' ;\n '.join(streams)
+    streams = ' ;\n '.join(streams)
+    num_streams = str(len(streams))
+
+    return steams, num_streams
+
+
+def create_metadata(radar, files):
+    """
+    """
+
+    # Datastreams attributes
+    datastreams, num_datastreams = parse_datastreams(files)
+    datastream_description = ('A string consisting of the datastream(s), '
+                              'datastream version(s), and datastream '
+                              'date (range).')
+
+    # History attribute
+    user = getpass.getuser()
+    host = platform.node()
+    time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    history = 'created by user {} on {} at {}'.format(user, host, time)
+
+    metadata = {
+        'process_version': '',
+        'command_line': '',
+        'site_id': 'sgp',
+        'facility_id': 'I7: Nardin, Oklahoma',
+        'country': 'USA',
+        'project': 'MC3E',
+        'institution': 'ARM Climate Research Facility',
+        'dod_version': '',
+        'comment': '',
+        'radar_0_instrument_name': radar.metadata['instrument_name'],
+        'radar_0_lon': radar.longitude['data'][0],
+        'radar_0_lat': radar.latitude['data'][0],
+        'radar_0_alt': radar.altitude['data'][0],
+        'state': '',
+        'Conventions': 'CF/Radial',
+        'reference': '',
+        'input_datastreams_num': num_datastreams,
+        'input_datastreams': datastreams,
+        'input_datastreams_description': datastream_description,
+        'description': '',
+        'title': 'Mapped Moments to Cartesian Grid',
+        'field_names': '',
+        'history': history}
+
+    return metadata
 
 
 def process(fcmac, grid_coords, Fn, dl, facility_id, grid_origin=None,
@@ -60,34 +110,6 @@ def process(fcmac, grid_coords, Fn, dl, facility_id, grid_origin=None,
         kappa_star=kappa_star, h_factor=h_factor, nb=nb, bsp=bsp,
         min_radius=min_radius, map_roi=map_roi, map_dist=map_dist, proj=proj,
         datum=datum, ellps=ellps, debug=False)
-
-    # Create history attribute
-    user = getpass.getuser()
-    host = platform.node()
-    time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-    history = 'created by user {} on {} at {}'.format(user, host, time)
-
-    # Update grid metadata
-    grid.metadata['process_version'] = ''
-    grid.metadata['command_line'] = ''
-    grid.metadata['site_id'] = 'sgp'
-    grid.metadata['facility_id'] = facility_id
-    grid.metadata['country'] = 'USA'
-    grid.metadata['project'] = 'MC3E'
-    grid.metadata['institution'] = 'McGill University'
-    grid.metadata['dod_version'] = ''
-    grid.metadata['state'] = ''
-    grid.metadata['Conventions'] = ''
-    grid.metadata['reference'] = ''
-    grid.metadata['input_datastreams_num'] = '1'
-    grid.metadata['input_datastreams'] = parse_datastreams([fcmac])
-    grid.metadata['input_datastreams_description'] = (
-        'A string consisting of the datastream(s), datastream version(s), '
-        'and datastream date (range)')
-    grid.metadata['description'] = ''
-    grid.metadata['title'] = 'Mapped Moments to Cartesian Grid'
-    grid.metadata['comment'] = ''
-    grid.metadata['history'] = history
 
     # ARM file name protocols
     date_stamp = num2date(grid.axes['time_start']['data'][0],
