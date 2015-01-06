@@ -22,9 +22,9 @@ FIELDS = ['corrected_reflectivity', 'corrected_velocity',
           'normalized_coherent_power', 'cross_correlation_ratio']
 
 # Define grid coordinates and origin
-COORDS = [np.arange(0, 10250, 250),
-          np.arange(-50000, 50500, 500),
-          np.arange(-50000, 50500, 500)]
+COORDS = [np.arange(0.0, 10250.0, 250.0),
+          np.arange(-50000.0, 50500.0, 500.0),
+          np.arange(-50000.0, 50500.0, 500.0)]
 ORIGIN = [36.605, -97.485]
 
 # Define gridding parameters
@@ -37,6 +37,7 @@ SPACING = 1220.0
 KAPPA = 0.5
 ROI = None
 MIN_RADIUS = 250.0
+FORMAT = 'NETCDF4_CLASSIC'
 
 
 def parse_datastreams(files, version='-9999'):
@@ -50,12 +51,12 @@ def parse_datastreams(files, version='-9999'):
         streams.append('{} : {} : {}'.format(stream, version, date))
 
     streams = ' ;\n '.join(streams)
-    num_streams = str(len(streams))
+    num_streams = len(files)
 
-    return steams, num_streams
+    return streams, num_streams
 
 
-def create_metadata(radar, files):
+def create_metadata(radar, files, facility_id):
     """
     """
 
@@ -75,7 +76,7 @@ def create_metadata(radar, files):
         'process_version': '',
         'command_line': '',
         'site_id': 'sgp',
-        'facility_id': 'I7: Nardin, Oklahoma',
+        'facility_id': facility_id,
         'country': 'USA',
         'project': 'MC3E',
         'institution': 'ARM Climate Research Facility',
@@ -99,7 +100,7 @@ def create_metadata(radar, files):
     return metadata
 
 
-def process(fcmac, Fn, dl, facility_id):
+def process(fcmac, output, Fn, dl, facility_id, debug=False):
     """
     """
 
@@ -111,23 +112,26 @@ def process(fcmac, Fn, dl, facility_id):
         radar, COORDS, grid_origin=ORIGIN, fields=FIELDS, toa=TOA,
         leafsize=10, k=NUM_POINTS, eps=0.0, weighting_function=FUNCTION,
         smooth_func=SMOOTH, roi_func=ROI, cutoff_radius=CUTOFF,
-        data_spacing=SPACING, kappa_star=KAPPA, h_factor=None, nb=None,
+        data_space=SPACING, kappa_star=KAPPA, h_factor=None, nb=None,
         bsp=None, min_radius=MIN_RADIUS, map_roi=True, map_dist=True,
-        proj='lcc', datum='NAD83', ellps='GRS80', debug=False)
+        proj='lcc', datum='NAD83', ellps='GRS80', debug=debug)
+
+    # Parse metadata
+    grid.metadata = create_metadata(radar, [fcmac], facility_id)
 
     # ARM file name protocols
     date_stamp = num2date(grid.axes['time_start']['data'][0],
                           grid.axes['time_start']['units'])
-    filename = 'sgpxsaprinnermmcg{}.{}.{}'.format(
+    filename = 'sgpxsaprinnermmcg{}.{}.{}.cdf'.format(
         Fn, dl, date_stamp.strftime('%Y%m%d.%H%M%S'))
 
     # Write gridded data to file
-    grid.write(os.path.join(output, filename), format=format)
+    grid.write(os.path.join(output, filename), format=FORMAT)
 
     return
 
 
-if __name__ = '__main__':
+if __name__ == '__main__':
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description=None)
@@ -137,9 +141,19 @@ if __name__ = '__main__':
     parser.add_argument('Fn', type=str, help=None)
     parser.add_argument('dl', type=str, help=None)
     parser.add_argument('facility_id', type=str, help=None)
-    parser.add_argument('-v', '--verbose', nargs='?', const=False, type=bool,
-                        help=None)
+    parser.add_argument('-v', '--verbose', nargs='?', type=bool, const=True,
+                        default=False, help=None)
+    parser.add_argument('--debug', nargs='?', type=bool, const=True,
+                        default=False, help=None)
     args = parser.parse_args()
+
+    if args.debug:
+        print 'source = %s' % args.source
+        print 'output = %s' % args.output
+        print 'stamp = %s' % args.stamp
+        print 'Fn = %s' % args.Fn
+        print 'dl = %s' % args.dl
+        print 'facility_id = %s' % args.facility_id
 
     # Parse all files to process
     files = [os.path.join(args.source, f) for f in
@@ -149,6 +163,7 @@ if __name__ = '__main__':
 
     for fcmac in files:
         if args.verbose:
-            print 'Processing file %s' % fcmac
+            print 'Processing file %s' % os.path.basename(fcmac)
 
-        process(fcmac, args.Fn, args.dl, args.facility_id)
+        process(fcmac, args.output, args.Fn, args.dl, args.facility_id,
+                args.debug)
