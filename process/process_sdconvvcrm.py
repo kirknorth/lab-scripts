@@ -7,37 +7,32 @@ import argparse
 import numpy as np
 
 from datetime import datetime
-from netCDF4 import num2date
+from netCDF4 import Dataset, num2date
 
-from pyart.io import read_cfradial
-from pyart.config import get_fillvalue
-from pyart.map.grid_test import map_radar_to_grid
+from pyart.io import read_grid
+from pyart.retrieve import winds
 
 
 ### GLOBAL VARIABLES ###
 ########################
 
-# Define fields to process
-FIELDS = ['corrected_reflectivity', 'corrected_velocity',
-          'normalized_coherent_power', 'cross_correlation_ratio']
-
-# Define grid coordinates and origin
-COORDS = [np.arange(0.0, 10250.0, 250.0),
-          np.arange(-50000.0, 50500.0, 500.0),
-          np.arange(-50000.0, 50500.0, 500.0)]
-ORIGIN = [36.605, -97.485]
-
-# Define gridding parameters
-NUM_POINTS = 300
-TOA = 17000.0
-FUNCTION = 'Barnes'
-SMOOTH = 'constant'
-CUTOFF = 5000.0
-SPACING = 1220.0
-KAPPA = 0.5
-ROI = None
-MIN_RADIUS = 250.0
+# Define output paramters
 FORMAT = 'NETCDF4_CLASSIC'
+
+# Define 3D-VAR algorithm parameters
+WGT_O = 1.0
+WGT_C = 500.0
+WGT_S1 = 1.0
+WGT_S2 = 1.0
+WGT_S3 = 1.0
+WGT_S4 = 0.1
+WGT_UB = 0.05
+WGT_VB = 0.05
+WGT_WB = 0.0
+WGT_W0 = 100.0
+LENGTH_SCALE = 250.0
+MAXITER = 300
+MAXITER_FIRST_PASS = 50
 
 
 def parse_datastreams(files, version='-9999'):
@@ -55,8 +50,7 @@ def parse_datastreams(files, version='-9999'):
 
     return streams, num_streams
 
-
-def create_metadata(radar, files):
+def create_metadata(files, facility_id):
     """
     """
 
@@ -76,16 +70,12 @@ def create_metadata(radar, files):
         'process_version': '',
         'command_line': '',
         'site_id': 'sgp',
-        'facility_id': 'I7: Nardin, Oklahoma',
+        'facility_id': facility_id,
         'country': 'USA',
         'project': 'MC3E',
         'institution': 'ARM Climate Research Facility',
         'dod_version': '',
         'comment': '',
-        'radar_0_instrument_name': radar.metadata['instrument_name'],
-        'radar_0_longitude': radar.longitude['data'][0],
-        'radar_0_latitude': radar.latitude['data'][0],
-        'radar_0_altitude': radar.altitude['data'][0],
         'state': '',
         'Conventions': 'CF/Radial',
         'reference': '',
@@ -93,40 +83,49 @@ def create_metadata(radar, files):
         'input_datastreams': datastreams,
         'input_datastreams_description': datastream_description,
         'description': '',
-        'title': 'Mapped Moments to Cartesian Grid',
+        'title': 'Convective Vertical Velocity',
         'field_names': '',
         'history': history}
 
     return metadata
 
 
-def process(fcmac, output, dl, debug=False):
+def process(fmmcg, fsonde, output, Fn, dl, facility_id, debug=False):
     """
     """
 
     # Read radar file
-    radar = read_cfradial(fcmac)
+    grid = read_grid(fmmcg)
+
+    # Read sounding file
+    sonde = Dataset(fsonde, mode='r')
 
     # Grid radar data
-    grid = map_radar_to_grid(
-        radar, COORDS, grid_origin=ORIGIN, fields=FIELDS, toa=TOA,
-        leafsize=10, k=NUM_POINTS, eps=0.0, weighting_function=FUNCTION,
-        smooth_func=SMOOTH, roi_func=ROI, cutoff_radius=CUTOFF,
-        data_space=SPACING, kappa_star=KAPPA, h_factor=None, nb=None,
-        bsp=None, min_radius=MIN_RADIUS, map_roi=True, map_dist=True,
-        proj='lcc', datum='NAD83', ellps='GRS80', debug=debug)
+    conv = winds.solve_wind_field(
+        [grid], sonde=sonde, target=None, technique='3d-var',
+        solver='scipy.fmin_cg', first_guess='zero', background='sounding',
+        sounding='ARM interpolated', fall_speed='Caya', finite_scheme='basic',
+        continuity_cost='Potvin', smooth_cost='Potvin', impermeability='weak',
+        first_pass=True, sub_beam=False, wgt_o=WGT_O, wgt_c=WGT_C,
+        wgt_s1=WGT_S1, wgt_s2=WGT_S2, wgt_s3=WGT_S3, wgt_s4=WGT_S4,
+        wgt_ub=WGT_UB, wgt_vb=WGT_VB, wgt_wb=WGT_WB, wgt_w0=WGT_W0,
+        length_scale=LENGTH_SCALE, use_qc=True, use_morphology=True,
+        structure=None, mds=0.0, ncp_min=0.2, rhv_min=0.6,
+        standard_density=True, maxiter=MAXITER,
+        maxiter_first_pass=MAXITER_FIRST_PASS, gtol=1.0e-1, disp=True,
+        debug=False, verbose=False)
 
     # Parse metadata
-    grid.metadata = create_metadata(radar, [fcmac])
+    conv.metadata = create_metadata([fmmcg], facility_id)
 
     # ARM file name protocols
-    date_stamp = num2date(grid.axes['time_start']['data'][0],
-                          grid.axes['time_start']['units'])
-    filename = 'sgpcsaprinnermmcgI7.{}.{}.cdf'.format(
-        dl, date_stamp.strftime('%Y%m%d.%H%M%S'))
+    date_stamp = num2date(conv.axes['time_start']['data'][0],
+                          conv.axes['time_start']['units'])
+    filename = 'sgpsdconvvcrm{}.{}.{}.cdf'.format(
+        Fn, dl, date_stamp.strftime('%Y%m%d.%H%M%S'))
 
     # Write gridded data to file
-    grid.write(os.path.join(output, filename), format=FORMAT)
+    conv.write(os.path.join(output, filename), format=FORMAT)
 
     return
 
@@ -138,7 +137,11 @@ if __name__ == '__main__':
     parser.add_argument('source', type=str, help=None)
     parser.add_argument('output', type=str, help=None)
     parser.add_argument('stamp', type=str, help=None)
-    parser.add_argument('dl', type=str, help=None)
+    parser.add_argument('sonde', type=str, help=None)
+    parser.add_argument('--Fn', nargs='?', type=str, default='C1', help=None)
+    parser.add_argument('--dl', nargs='?', type=str, default='c1', help=None)
+    parser.add_argument('--facility', nargs='?', type=str,
+                        default='C1: Lamont, Oklahoma', help=None)
     parser.add_argument('-v', '--verbose', nargs='?', type=bool, const=True,
                         default=False, help=None)
     parser.add_argument('--debug', nargs='?', type=bool, const=True,
@@ -149,7 +152,10 @@ if __name__ == '__main__':
         print 'source = %s' % args.source
         print 'output = %s' % args.output
         print 'stamp = %s' % args.stamp
+        print 'sonde = %s' % args.sonde
+        print 'Fn = %s' % args.Fn
         print 'dl = %s' % args.dl
+        print 'facility = %s' % args.facility
 
     # Parse all files to process
     files = [os.path.join(args.source, f) for f in
@@ -157,8 +163,9 @@ if __name__ == '__main__':
     if args.verbose:
         print 'Number of files to process = %i' % len(files)
 
-    for fcmac in files:
+    for fmmcg in files:
         if args.verbose:
-            print 'Processing file %s' % os.path.basename(fcmac)
+            print 'Processing file %s' % os.path.basename(fmmcg)
 
-        process(fcmac, args.output, args.dl, args.debug)
+        process(fmmcg, args.sonde, args.output, args.Fn, args.dl,
+                args.facility, debug=args.debug)

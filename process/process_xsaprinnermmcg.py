@@ -28,7 +28,7 @@ COORDS = [np.arange(0.0, 10250.0, 250.0),
 ORIGIN = [36.605, -97.485]
 
 # Define gridding parameters
-NUM_POINTS = 250
+NUM_POINTS = 300
 TOA = 17000.0
 FUNCTION = 'Barnes'
 SMOOTH = 'constant'
@@ -83,9 +83,9 @@ def create_metadata(radar, files, facility_id):
         'dod_version': '',
         'comment': '',
         'radar_0_instrument_name': radar.metadata['instrument_name'],
-        'radar_0_lon': radar.longitude['data'][0],
-        'radar_0_lat': radar.latitude['data'][0],
-        'radar_0_alt': radar.altitude['data'][0],
+        'radar_0_longitude': radar.longitude['data'][0],
+        'radar_0_latitude': radar.latitude['data'][0],
+        'radar_0_altitude': radar.altitude['data'][0],
         'state': '',
         'Conventions': 'CF/Radial',
         'reference': '',

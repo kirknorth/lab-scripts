@@ -22,13 +22,13 @@ FIELDS = ['corrected_reflectivity', 'corrected_velocity',
           'normalized_coherent_power', 'cross_correlation_ratio']
 
 # Define grid coordinates and origin
-COORDS = [np.arange(0.0, 10250.0, 250.0),
-          np.arange(-50000.0, 50500.0, 500.0),
-          np.arange(-50000.0, 50500.0, 500.0)]
+COORDS = [np.arange(0.0, 15250.0, 250.0),
+          np.arange(-10000.0, 10250.0, 250.0),
+          np.arange(-10000.0, 10250.0, 250.0)]
 ORIGIN = [36.605, -97.485]
 
 # Define gridding parameters
-NUM_POINTS = 300
+NUM_POINTS = 600
 TOA = 17000.0
 FUNCTION = 'Barnes'
 SMOOTH = 'constant'

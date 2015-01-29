@@ -17,6 +17,9 @@ from pyart.map.grid_test import map_radar_to_grid
 ### GLOBAL VARIABLES ###
 ########################
 
+# Define number of elevation scans for NEXRAD convection VCP
+NUM_TILTS = 14
+
 # Define fields to process
 FIELDS = ['reflectivity', 'velocity', 'spectrum_width']
 
@@ -100,12 +103,19 @@ def create_metadata(radar, files, facility_id):
 
 
 def process(filename, output, inst, qualifier, Fn, dl, facility_id,
-            debug=False):
+            debug=False, verbose=False):
     """
     """
 
     # Read radar file
     radar = read_nexrad_archive(filename)
+
+    # Check if radar VCP is convective
+    if np.unique(radar.fixed_angle['data']).size < NUM_TILTS:
+        if verbose:
+            print 'File %s not convective VCP' % os.path.basename(filename)
+
+        return
 
     # Grid radar data
     grid = map_radar_to_grid(
@@ -171,4 +181,5 @@ if __name__ == '__main__':
             print 'Processing file %s' % os.path.basename(filename)
 
         process(filename, args.output, args.inst, args.qualifier, args.Fn,
-                args.dl, args.facility_id, args.debug)
+                args.dl, args.facility_id, debug=args.debug,
+                verbose=args.verbose)
