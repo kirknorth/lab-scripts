@@ -12,27 +12,21 @@ from datetime import datetime
 ### GLOBAL VARIABLES ###
 ########################
 
-# Directories
+# Common input directories
 INPUT_DIRS = ['/storage/kirk/MC3E/processed_data/csapr/',
               '/storage/kirk/MC3E/processed_data/xsapr/',
               '/storage/kirk/MC3E/processed_data/nexrad/']
 
-# Stamps in file names to search for
-STAMPS = ['csaprcrmC1mmcgI7.c10.20110425',
-          'xsaprcrmC1mmcgI4.c10.20110425',
-          'xsaprcrmC1mmcgI5.c10.20110425',
-          'nexradV06crmC1mmcgKVNX.c0.20110425']
 
-
-def sort_by_time(suffix='cdf', verbose=False):
+def sort_by_time(stamps, suffix='cdf', verbose=False):
     """
     """
 
     # Parse all sources for any specified stamps
     files = []
-    for source in INPUT_DIRS:
-        for f in sorted(os.listdir(source)):
-            if any(stamp in f for stamp in STAMPS) and f.endswith(suffix):
+    for inpdir in INPUT_DIRS:
+        for f in sorted(os.listdir(inpdir)):
+            if any(stamp in f for stamp in stamps) and f.endswith(suffix):
                 files.append(f)
     if verbose:
         print 'Total number of grids = %i' % len(files)
@@ -76,20 +70,30 @@ def group_by_lag(files, times, lag=240, remove_single=False, verbose=False):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description=None)
+    parser.add_argument('stamps', nargs='+', type=str, help=None)
     parser.add_argument('outdir', type=str, help=None)
-    parser.add_argument('fname', type=str, help=None)
-    parser.add_argument('--lag', nargs='?', type=int, const=240, default=240,
+    parser.add_argument('filename', type=str, help=None)
+    parser.add_argument('--lag', nargs='?', type=int, const=120, default=120,
                         help=None)
     parser.add_argument('-v', '--verbose', nargs='?', type=bool, const=True,
                         default=False, help=None)
+    parser.add_argument('-db', '--debug', nargs='?', type=bool, const=True,
+                        default=False, help=None)
     args = parser.parse_args()
 
+    if args.debug:
+        print 'stamps = %s' % args.stamps
+        print 'outdir = %s' % args.outdir
+        print 'filename = %s' % args.filename
+        print 'lag = %s' % args.lag
+
     # First sort all files by time in ascending order
-    files, times = sort_by_time(suffix='cdf', verbose=args.verbose)
+    files, times = sort_by_time(
+        args.stamps, suffix='cdf', verbose=args.verbose)
 
     # Group files by lag
     groups = group_by_lag(files, times, lag=args.lag, verbose=args.verbose)
 
     # Save grouped grids to a JSON file
-    with open(os.path.join(args.outdir, args.fname), 'w') as fid:
+    with open(os.path.join(args.outdir, args.filename), 'w') as fid:
         json.dump(groups, fid, indent=2)

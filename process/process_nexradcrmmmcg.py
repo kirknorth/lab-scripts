@@ -9,7 +9,7 @@ import numpy as np
 from datetime import datetime
 from netCDF4 import num2date
 
-from pyart.io import read_nexrad_archive
+from pyart.io import read_cfradial
 from pyart.config import get_fillvalue
 from pyart.map.grid_test import map_radar_to_grid
 
@@ -21,13 +21,14 @@ from pyart.map.grid_test import map_radar_to_grid
 NUM_TILTS = 14
 
 # Define fields to process
-FIELDS = ['reflectivity', 'velocity', 'spectrum_width']
+FIELDS = ['corrected_reflectivity', 'corrected_velocity', 'spectrum_width']
 
 # Define grid coordinates and origin
 COORDS = [np.arange(0.0, 10250.0, 250.0),
           np.arange(-10000.0, 10250.0, 250.0),
           np.arange(-10000.0, 10250.0, 250.0)]
 ORIGIN = [36.605, -97.485]
+FN = 'C1'
 
 # Define gridding parameters
 NUM_POINTS = 600
@@ -42,7 +43,7 @@ MIN_RADIUS = 250.0
 FORMAT = 'NETCDF4_CLASSIC'
 
 
-def parse_datastreams(files, version='-9999'):
+def _parse_datastreams_raw(files, version='-9999'):
     """
     """
     streams = []
@@ -50,6 +51,22 @@ def parse_datastreams(files, version='-9999'):
         fsplit = os.path.basename(f).split('_')
         stream = '{}{}'.format(fsplit[0][:4].lower(), fsplit[2])
         date = '{}.{}'.format(fsplit[0][4:], fsplit[1])
+        streams.append('{} : {} : {}'.format(stream, version, date))
+
+    streams = ' ;\n '.join(streams)
+    num_streams = len(files)
+
+    return streams, num_streams
+
+
+def parse_datastreams(files, version='-9999'):
+    """
+    """
+    streams = []
+    for f in files:
+        fsplit = os.path.basename(f).split('.')
+        stream = '.'.join(fsplit[:2])
+        date = '.'.join(fsplit[2:4])
         streams.append('{} : {} : {}'.format(stream, version, date))
 
     streams = ' ;\n '.join(streams)
@@ -102,19 +119,18 @@ def create_metadata(radar, files, facility_id):
     return metadata
 
 
-def process(filename, output, inst, qualifier, Fn, dl, facility_id,
-            debug=False, verbose=False):
+def process(filename, outdir, qualifier, Fn, dl, facility_id, debug=False,
+            verbose=False):
     """
     """
 
     # Read radar file
-    radar = read_nexrad_archive(filename)
+    radar = read_cfradial(filename)
 
     # Check if radar VCP is convective
     if np.unique(radar.fixed_angle['data']).size < NUM_TILTS:
         if verbose:
             print 'File %s not convective VCP' % os.path.basename(filename)
-
         return
 
     # Grid radar data
@@ -133,11 +149,11 @@ def process(filename, output, inst, qualifier, Fn, dl, facility_id,
     date_stamp = num2date(grid.axes['time_start']['data'][0],
                           grid.axes['time_start']['units'])
 
-    filename = '{}{}crm{}mmcg.{}.{}.cdf'.format(
-        inst, qualifier, Fn, dl, date_stamp.strftime('%Y%m%d.%H%M%S'))
+    filename = 'nexradwsr88d{}crm{}mmcg{}.{}.{}.cdf'.format(
+        qualifier, FN, Fn, dl, date_stamp.strftime('%Y%m%d.%H%M%S'))
 
     # Write gridded data to file
-    grid.write(os.path.join(output, filename), format=FORMAT)
+    grid.write(os.path.join(outdir, filename), format=FORMAT)
 
     return
 
@@ -146,10 +162,9 @@ if __name__ == '__main__':
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description=None)
-    parser.add_argument('source', type=str, help=None)
-    parser.add_argument('output', type=str, help=None)
+    parser.add_argument('inpdir', type=str, help=None)
+    parser.add_argument('outdir', type=str, help=None)
     parser.add_argument('stamp', type=str, help=None)
-    parser.add_argument('inst', type=str, help=None)
     parser.add_argument('qualifier', type=str, help=None)
     parser.add_argument('Fn', type=str, help=None)
     parser.add_argument('dl', type=str, help=None)
@@ -161,18 +176,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.debug:
-        print 'source = %s' % args.source
-        print 'output = %s' % args.output
+        print 'inpdir = %s' % args.inpdir
+        print 'outdir = %s' % args.outdir
         print 'stamp = %s' % args.stamp
-        print 'inst = %s' % args.inst
         print 'qualifier = %s' % args.qualifier
         print 'Fn = %s' % args.Fn
         print 'dl = %s' % args.dl
         print 'facility_id = %s' % args.facility_id
 
     # Parse all files to process
-    files = [os.path.join(args.source, f) for f in
-             sorted(os.listdir(args.source)) if args.stamp in f]
+    files = [os.path.join(args.inpdir, f) for f in
+             sorted(os.listdir(args.inpdir)) if args.stamp in f]
     if args.verbose:
         print 'Number of files to process = %i' % len(files)
 
@@ -180,6 +194,5 @@ if __name__ == '__main__':
         if args.verbose:
             print 'Processing file %s' % os.path.basename(filename)
 
-        process(filename, args.output, args.inst, args.qualifier, args.Fn,
-                args.dl, args.facility_id, debug=args.debug,
-                verbose=args.verbose)
+        process(filename, args.outdir, args.qualifier, args.Fn, args.dl,
+                args.facility_id, debug=args.debug, verbose=args.verbose)
