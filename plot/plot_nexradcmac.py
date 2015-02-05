@@ -87,7 +87,7 @@ def multipanel(inpdir, outdir, stamp, instrument_name, dpi=100, verbose=False):
 
         # Create figure instance
         subs = {'xlim': (-400, 400), 'ylim': (-400, 400)}
-        figs = {'figsize': (62, 45)}
+        figs = {'figsize': (8, 6)}
         fig, ax = plt.subplots(
             nrows=5, ncols=len(SWEEPS), subplot_kw=subs, **figs)
 
@@ -128,7 +128,6 @@ def multipanel(inpdir, outdir, stamp, instrument_name, dpi=100, verbose=False):
             ax[i,j].set_ylabel('Northward Range from Radar (km)')
             ax[i,j].grid(which='major')
 
-
         # Save figure
         time_offset = radar.variables['time_offset']
         date_stamp = num2date(time_offset[:].min(), time_offset.units)
@@ -149,7 +148,8 @@ if __name__ == '__main__':
     parser.add_argument('outdir', type=str, help=None)
     parser.add_argument('stamp', type=str, help=None)
     parser.add_argument('instrument_name', type=str, help=None)
-    parser.add_argument('--dpi', nargs='?', const=50, type=int, help=None)
+    parser.add_argument('--dpi', nargs='?', type=int, const=50, default=50,
+                        help=None)
     parser.add_argument('-v', '--verbose', nargs='?', type=bool, const=True,
                         default=False, help=None)
     parser.add_argument('--debug', nargs='?', type=bool, const=True,

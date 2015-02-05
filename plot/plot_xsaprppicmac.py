@@ -2,6 +2,7 @@
 
 import os
 import argparse
+import multiprocessing
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -10,6 +11,10 @@ from matplotlib import rcParams, colors
 from matplotlib.ticker import MultipleLocator
 
 from pyart.graph import cm
+
+### GLOBAL VARIABLES ###
+########################
+SWEEPS = [0, 1, 2, 5, 8, 13, 17, 21]
 
 
 ### Set figure parameters ###
@@ -57,7 +62,6 @@ def pcolormesh(radar, field, sweep=0, cmap=None, norm=None, ax=None):
     # Create plot
     qm = ax.pcolormesh(X, Y, radar.variables[field][s0:sf,:], cmap=cmap,
                        norm=norm, shading='flat', alpha=None)
-    ax.grid(which='major')
 
     # Create title
     title = '{} {:.1f} deg {}Z\n {}'.format(
@@ -68,7 +72,7 @@ def pcolormesh(radar, field, sweep=0, cmap=None, norm=None, ax=None):
     return qm
 
 
-def multipanel(source, output, stamp, sweeps, dpi=100, verbose=False):
+def multipanel(source, output, stamp, dpi=100, verbose=False):
     """
     """
     files = [source + f for f in sorted(os.listdir(source)) if stamp in f]
@@ -85,9 +89,36 @@ def multipanel(source, output, stamp, sweeps, dpi=100, verbose=False):
 
         # Create figure instance
         subs = {'xlim': (-40, 40), 'ylim': (-40, 40)}
-        figs = {'figsize': (60, 45)}
-        fig, ax = plt.subplots(nrows=6, ncols=len(sweeps),
+        figs = {'figsize': (62, 45)}
+        fig, ax = plt.subplots(nrows=6, ncols=len(SWEEPS),
                                subplot_kw=subs, **figs)
+
+        # Iterate over each sweep
+        for j, sweep in enumerate(SWEEPS):
+
+            # (a) Raw reflectivity
+            qma = pcolormesh(radar, 'reflectivity', sweep, cmap=cmap_refl,
+                             norm=norm_refl, ax=ax[0,j])
+
+            # (b) Corrected reflectivity
+            qmb = pcolormesh(radar, 'corrected_reflectivity', sweep,
+                             cmap=cmap_refl, norm=norm_refl, ax=ax[1,j])
+
+            # (c) Raw Doppler velocity
+            qmc = pcolormesh(radar, 'velocity', sweep,
+                             cmap=cmap_vdop, norm=norm_vdop_raw, ax=ax[2,j])
+
+            # (d) Corrected Doppler velocity
+            qmd = pcolormesh(radar, 'corrected_velocity', sweep,
+                             cmap=cmap_vdop, norm=norm_vdop_cor, ax=ax[3,j])
+
+            # (e) Normalized coherent power
+            qme = pcolormesh(radar, 'normalized_coherent_power', sweep,
+                             cmap=cmap_ncp, norm=norm_ncp, ax=ax[4,j])
+
+            # (f) Correlation coefficient
+            qmf = pcolormesh(radar, 'cross_correlation_ratio', sweep,
+                             cmap=cmap_rhv, norm=norm_rhv, ax=ax[5,j])
 
         # Format plot axes
         for i, j in np.ndindex(ax.shape):
@@ -97,17 +128,7 @@ def multipanel(source, output, stamp, sweeps, dpi=100, verbose=False):
             ax[i,j].yaxis.set_minor_locator(MultipleLocator(5))
             ax[i,j].set_xlabel('Eastward Range from Radar (km)')
             ax[i,j].set_ylabel('Northward Range from Radar (km)')
-
-        # Iterate over each sweep
-        for j, sweep in enumerate(sweeps):
-
-            # (a) Raw reflectivity
-            qma = pcolormesh(radar, 'reflectivity', sweep, cmap=cmap_refl,
-                             norm=norm_refl, ax=ax[0,j])
-
-            # (b) Corrected reflectivity
-            qmb = pcolormesh(radar, 'corrected_reflectivity', sweep,
-                             cmap=cmap_refl, norm=norm_refl, ax=ax[1,j])
+            ax[i,j].grid(which='major')
 
 
         # Save figure
@@ -128,13 +149,19 @@ if __name__ == '__main__':
     parser.add_argument('source', type=str, help=None)
     parser.add_argument('output', type=str, help=None)
     parser.add_argument('stamp', type=str, help=None)
-    parser.add_argument('--sweeps', nargs='?', const=[0, 2, 5, 8, 13, 17, 21],
-                        type=list, help=None)
     parser.add_argument('--dpi', nargs='?', const=50, type=int, help=None)
-    parser.add_argument('-v', '--verbose', nargs='?', const=False, type=bool,
-                        help=None)
+    parser.add_argument('-v', '--verbose', nargs='?', type=bool, const=True,
+                        default=False, help=None)
+    parser.add_argument('--debug', nargs='?', type=bool, const=True,
+                        default=False, help=None)
     args = parser.parse_args()
 
+    if args.debug:
+        print 'source = %s' % args.source
+        print 'output = %s' % args.output
+        print 'stamp = %s' % args.stamp
+        print 'dpi = %i' % args.dpi
+
     # Call desired plotting function
-    multipanel(args.source, args.output, args.stamp, args.sweeps, dpi=args.dpi,
+    multipanel(args.source, args.output, args.stamp, dpi=args.dpi,
                verbose=args.verbose)

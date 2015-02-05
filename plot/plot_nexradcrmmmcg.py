@@ -66,10 +66,11 @@ def pcolormesh(grid, field, inst, index=0, cmap=None, norm=None, ax=None):
     return qm
 
 
-def multipanel(source, output, stamp, inst, dpi=100, verbose=False):
+def multipanel(inpdir, outdir, stamp, inst, dpi=100, verbose=False):
     """
     """
-    files = [source + f for f in sorted(os.listdir(source)) if stamp in f]
+    files = [os.path.join(inpdir, f) for f in sorted(os.listdir(inpdir))
+             if stamp in f]
     if verbose:
         print 'Number of files to plot = %i' % len(files)
 
@@ -90,11 +91,11 @@ def multipanel(source, output, stamp, inst, dpi=100, verbose=False):
         for i, k in enumerate(HEIGHTS):
 
             # (a) Reflectivity
-            qma = pcolormesh(grid, 'reflectivity', inst, index=k,
+            qma = pcolormesh(grid, 'corrected_reflectivity', inst, index=k,
                              cmap=cmap_refl, norm=norm_refl, ax=ax[0,i])
 
             # (b) Doppler velocity
-            qmb = pcolormesh(grid, 'velocity', inst, index=k,
+            qmb = pcolormesh(grid, 'corrected_velocity', inst, index=k,
                              cmap=cmap_vdop, norm=norm_vdop, ax=ax[1,i])
 
             # (c) Spectrum width
@@ -121,9 +122,9 @@ def multipanel(source, output, stamp, inst, dpi=100, verbose=False):
 
         # Save figure
         date_stamp = num2date(time_start[0], time_start.units)
-        filename = '{}{}.png'.format(
-            output, date_stamp.strftime('%Y%m%d.%H%M%S'))
-        fig.savefig(filename, format='png', dpi=dpi, bbox_inches='tight')
+        filename = '{}.png'.format(date_stamp.strftime('%Y%m%d.%H%M%S'))
+        fig.savefig(os.path.join(outdir, filename), format='png', dpi=dpi,
+                    bbox_inches='tight')
         plt.close(fig)
 
     return
@@ -133,8 +134,8 @@ if __name__ == '__main__':
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description=None)
-    parser.add_argument('source', type=str, help=None)
-    parser.add_argument('output', type=str, help=None)
+    parser.add_argument('inpdir', type=str, help=None)
+    parser.add_argument('outdir', type=str, help=None)
     parser.add_argument('stamp', type=str, help=None)
     parser.add_argument('inst', type=str, help=None)
     parser.add_argument('--dpi', nargs='?', const=50, default=50, type=int,
@@ -144,5 +145,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Call desired plotting function
-    multipanel(args.source, args.output, args.stamp, args.inst, dpi=args.dpi,
+    multipanel(args.inpdir, args.outdir, args.stamp, args.inst, dpi=args.dpi,
                verbose=args.verbose)
