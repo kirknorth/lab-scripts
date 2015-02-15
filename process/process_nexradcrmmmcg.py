@@ -13,6 +13,16 @@ from pyart.io import read_cfradial
 from pyart.config import get_fillvalue
 from pyart.map.grid_test import map_radar_to_grid
 
+### 915-MHz wind profiler locations ###
+#######################################
+
+""" ARM SGP Site
+C1, Lamont, Ok (36.605, -97.485)
+I8, Tonkawa, OK (36.709, -97.388)
+I9, Billings, OK (36.476, -97.422)
+I10, Lamont, OK (36.666, -97.624)
+"""
+
 
 ### GLOBAL VARIABLES ###
 ########################
@@ -27,8 +37,8 @@ FIELDS = ['corrected_reflectivity', 'corrected_velocity', 'spectrum_width']
 COORDS = [np.arange(0.0, 10250.0, 250.0),
           np.arange(-10000.0, 10250.0, 250.0),
           np.arange(-10000.0, 10250.0, 250.0)]
-ORIGIN = [36.605, -97.485]
-FN = 'C1'
+ORIGIN = [36.476, -97.422]
+FN = 'I9'
 
 # Define gridding parameters
 NUM_POINTS = 600
@@ -148,7 +158,6 @@ def process(filename, outdir, qualifier, Fn, dl, facility_id, debug=False,
     # ARM file name protocols
     date_stamp = num2date(grid.axes['time_start']['data'][0],
                           grid.axes['time_start']['units'])
-
     filename = 'nexradwsr88d{}crm{}mmcg{}.{}.{}.cdf'.format(
         qualifier, FN, Fn, dl, date_stamp.strftime('%Y%m%d.%H%M%S'))
 
