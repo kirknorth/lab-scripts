@@ -50,13 +50,13 @@ norm_vdop = colors.BoundaryNorm(np.arange(-16, 17, 1), cmap_vdop.N)
 norm_ncp = colors.BoundaryNorm(np.arange(0, 1.1, 0.1), cmap_ncp.N)
 norm_rhv = colors.BoundaryNorm(np.arange(0, 1.1, 0.1), cmap_rhv.N)
 norm_sw = colors.BoundaryNorm(np.arange(0, 11, 1), cmap_sw.N)
-norm_phi = colors.BoundaryNorm(np.arange(0, 365, 5), cmap_phi.N)
+norm_phi = colors.BoundaryNorm(np.arange(-180, 185, 5), cmap_phi.N)
 ticks_refl = np.arange(-8, 72, 8)
 ticks_vdop = np.arange(-16, 20, 4)
 ticks_ncp = np.arange(0, 1.2, 0.2)
 ticks_rhv = np.arange(0, 1.2, 0.2)
 ticks_sw = np.arange(0, 11, 1)
-ticks_phi = np.arange(0, 420, 60)
+ticks_phi = np.arange(-180, 180, 40)
 
 
 def _pcolormesh(radar, field, sweep=0, cmap=None, norm=None, ax=None):
