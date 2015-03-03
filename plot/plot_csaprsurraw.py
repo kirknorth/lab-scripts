@@ -11,16 +11,16 @@ from matplotlib import rcParams, colors
 from matplotlib.ticker import MultipleLocator
 
 from pyart.graph import cm
-from pyart.io import read_sigmet
+from pyart.io import read_mdv
 
 ### GLOBAL VARIABLES ###
 ########################
 
 # Define the proper number of sweeps --> VCP to plot
-VCP_SWEEPS = 22
+VCP_SWEEPS = 17
 
 # Define sweeps to be plotted
-SWEEPS = [0, 1, 2, 5, 8, 13, 17, 21]
+SWEEPS = [0, 1, 2, 5, 8, 10, 13, 16]
 
 # Define fields to exclude from radar object
 EXCLUDE_FIELDS = ['corrected_reflectivity', 'radar_echo_classification',
@@ -103,8 +103,7 @@ def multipanel(inpdir, outdir, stamp, dpi=50, verbose=False):
     for f in files:
 
         # Parse input file
-        radar = read_sigmet(
-	   f, time_ordered='none', exclude_fields=EXCLUDE_FIELDS)
+        radar = read_mdv(f, exclude_fields=EXCLUDE_FIELDS)
 
         if radar.nsweeps != VCP_SWEEPS:
             continue
@@ -113,7 +112,7 @@ def multipanel(inpdir, outdir, stamp, dpi=50, verbose=False):
             print 'Currently plotting file %s' % os.path.basename(f)
 
         # Create figure instance
-        subs = {'xlim': (-40, 40), 'ylim': (-40, 40)}
+        subs = {'xlim': (-117, 117), 'ylim': (-117, 117)}
         figs = {'figsize': (62, 45)}
         fig, ax = plt.subplots(
             nrows=6, ncols=len(SWEEPS), subplot_kw=subs, **figs)
@@ -142,7 +141,7 @@ def multipanel(inpdir, outdir, stamp, dpi=50, verbose=False):
                 norm=norm_rhv, ax=ax[3,j])
 
             # (e) Spectrum width
-            qme = _pcolormesh(
+	    qme = _pcolormesh(
                 radar, 'spectrum_width', sweep=sweep, cmap=cmap_sw,
                 norm=norm_sw, ax=ax[4,j])
 
@@ -153,9 +152,9 @@ def multipanel(inpdir, outdir, stamp, dpi=50, verbose=False):
 
         # Format plot axes
         for i, j in np.ndindex(ax.shape):
-            ax[i,j].xaxis.set_major_locator(MultipleLocator(10))
+            ax[i,j].xaxis.set_major_locator(MultipleLocator(20))
             ax[i,j].xaxis.set_minor_locator(MultipleLocator(5))
-            ax[i,j].yaxis.set_major_locator(MultipleLocator(10))
+            ax[i,j].yaxis.set_major_locator(MultipleLocator(20))
             ax[i,j].yaxis.set_minor_locator(MultipleLocator(5))
             ax[i,j].set_xlabel('Eastward Range from Radar (km)')
             ax[i,j].set_ylabel('Northward Range from Radar (km)')
