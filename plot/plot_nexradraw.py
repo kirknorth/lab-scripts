@@ -6,30 +6,24 @@ import multiprocessing
 import numpy as np
 import matplotlib.pyplot as plt
 
-from matplotlib import rcParams
-from matplotlib.colorbar import make_axes
-from matplotlib.colors import BoundaryNorm
-from matplotlib.ticker import MultipleLocator
 from netCDF4 import num2date
+from matplotlib import rcParams, colors
+from matplotlib.ticker import MultipleLocator
 
+from pyart.aux_io import read_radx
 from pyart.graph import cm
-from pyart.io import read_sigmet
 
 ### GLOBAL VARIABLES ###
 ########################
 
 # Define the proper number of sweeps --> VCP to plot
-VCP_SWEEPS = 22
+VCP_SWEEPS = 14
+
+# Define sweeps to plot
+SWEEPS = [0, 1, 2, 3, 5, 8, 10, 13]
 
 # Define maximum range in kilometers to plot
-MAX_RANGE = 40.0
-
-# Define sweeps to be plotted
-SWEEPS = [0, 1, 2, 5, 8, 13, 17, 21]
-
-# Define fields to exclude from radar object
-EXCLUDE_FIELDS = ['corrected_reflectivity', 'radar_echo_classification',
-                  'corrected_differential_reflectivity']
+MAX_RANGE = 200.0
 
 ### Set figure parameters ###
 rcParams['axes.linewidth'] = 1.5
@@ -42,28 +36,25 @@ rcParams['ytick.major.width'] = 1
 rcParams['ytick.minor.size'] = 2
 rcParams['ytick.minor.width'] = 1
 
-### Define color maps ###
+### Define colormaps and their boundaries ###
 cmap_refl = cm.NWSRef
 cmap_vdop = plt.get_cmap('jet')
-cmap_ncp = plt.get_cmap('jet')
-cmap_rhv = plt.get_cmap('jet')
 cmap_sw = plt.get_cmap('jet')
-cmap_phi = plt.get_cmap('jet')
-norm_refl = BoundaryNorm(np.arange(-8, 66, 2), cmap_refl.N)
-norm_vdop = BoundaryNorm(np.arange(-16, 17, 1), cmap_vdop.N)
-norm_ncp = BoundaryNorm(np.arange(0, 1.1, 0.1), cmap_ncp.N)
-norm_rhv = BoundaryNorm(np.arange(0, 1.1, 0.1), cmap_rhv.N)
-norm_sw = BoundaryNorm(np.arange(0, 11, 1), cmap_sw.N)
-norm_phi = BoundaryNorm(np.arange(0, 365, 5), cmap_phi.N)
+cmap_rhohv = plt.get_cmap('jet')
+cmap_zdr = plt.get_cmap('jet')
+cmap_phidp = plt.get_cmap('jet')
+norm_refl = colors.BoundaryNorm(np.arange(-8, 66, 2), cmap_refl.N)
+norm_vdop = colors.BoundaryNorm(np.arange(-32, 34, 2), cmap_vdop.N)
+norm_sw = colors.BoundaryNorm(np.arange(0, 10.5, 0.5), cmap_sw.N)
+norm_rhohv = colors.BoundaryNorm(np.arange(0, 1.1, 0.1), cmap_rhohv.N)
+norm_zdr = colors.BoundaryNorm(np.arange(-10, 10.5, 0.5), cmap_zdr.N)
+norm_phidp = colors.BoundaryNorm(np.arange(0, 181, 1), cmap_phidp.N)
 ticks_refl = np.arange(-8, 72, 8)
-ticks_vdop = np.arange(-16, 20, 4)
-ticks_ncp = np.arange(0, 1.2, 0.2)
-ticks_rhv = np.arange(0, 1.2, 0.2)
+ticks_vdop = np.arange(-32, 40, 8)
 ticks_sw = np.arange(0, 11, 1)
-ticks_phi = np.arange(0, 420, 60)
 
 
-def _pcolormesh(radar, field, sweep=0, cmap=None, norm=None, ax=None):
+def pcolormesh(radar, field, sweep=0, cmap=None, norm=None, ax=None):
     """
     """
     if ax is None:
@@ -102,21 +93,21 @@ def _pcolormesh(radar, field, sweep=0, cmap=None, norm=None, ax=None):
     return qm
 
 
-def multipanel(inpdir, outdir, stamp, dpi=50, verbose=False):
+def multipanel_V03(inpdir, outdir, stamp, dpi=100, verbose=False):
     """
     """
-
     files = [os.path.join(inpdir, f) for f in sorted(os.listdir(inpdir))
              if stamp in f]
+
     if verbose:
         print 'Number of files to plot = %i' % len(files)
 
     for f in files:
 
         # Parse input file
-        radar = read_sigmet(
-	   f, time_ordered='none', exclude_fields=EXCLUDE_FIELDS)
+        radar = read_radx(f)
 
+        # Check the number of sweeps are consistent with defined VCP
         if radar.nsweeps != VCP_SWEEPS:
             continue
 
@@ -126,68 +117,48 @@ def multipanel(inpdir, outdir, stamp, dpi=50, verbose=False):
         # Create figure instance
         subs = {'xlim': (-MAX_RANGE, MAX_RANGE),
                 'ylim': (-MAX_RANGE, MAX_RANGE)}
-        figs = {'figsize': (62, 45)}
+        figs = {'figsize': (66, 24)}
         fig, ax = plt.subplots(
-            nrows=6, ncols=len(SWEEPS), subplot_kw=subs, **figs)
+            nrows=3, ncols=len(SWEEPS), subplot_kw=subs, **figs)
 
         # Iterate over each sweep
         for j, sweep in enumerate(SWEEPS):
 
-            # (a) Raw reflectivity
-            qma = _pcolormesh(
-                radar, 'reflectivity', sweep=sweep, cmap=cmap_refl,
-                norm=norm_refl, ax=ax[0,j])
+            # (a) Reflectivity
+            qma = pcolormesh(
+                radar, 'REF', sweep=sweep, cmap=cmap_refl, norm=norm_refl,
+                ax=ax[0,j])
 
-            # (b) Raw Doppler velocity
-            qmb = _pcolormesh(
-                radar, 'velocity', sweep=sweep, cmap=cmap_vdop,
-                norm=norm_vdop, ax=ax[1,j])
+            # (b) Doppler velocity
+            qmb = pcolormesh(
+                radar, 'VEL', sweep=sweep, cmap=cmap_vdop, norm=norm_vdop,
+                ax=ax[1,j])
 
-            # (c) Normalized coherent power
-            qmc = _pcolormesh(
-                radar, 'normalized_coherent_power', sweep=sweep, cmap=cmap_ncp,
-                norm=norm_ncp, ax=ax[2,j])
-
-            # (d) Correlation coefficient
-            qmd = _pcolormesh(
-                radar, 'cross_correlation_ratio', sweep=sweep, cmap=cmap_rhv,
-                norm=norm_rhv, ax=ax[3,j])
-
-            # (e) Spectrum width
-            qme = _pcolormesh(
-                radar, 'spectrum_width', sweep=sweep, cmap=cmap_sw,
-                norm=norm_sw, ax=ax[4,j])
-
-            # (f) Differential phase
-            qmf = _pcolormesh(
-                radar, 'differential_phase', sweep=sweep, cmap=cmap_phi,
-                norm=norm_phi, ax=ax[5,j])
+            # (c) Spectrum width
+            qmc = pcolormesh(
+                radar, 'SW', sweep=sweep, cmap=cmap_sw, norm=norm_sw,
+                ax=ax[2,j])
 
         # Format plot axes
         for i, j in np.ndindex(ax.shape):
-            ax[i,j].xaxis.set_major_locator(MultipleLocator(10))
-            ax[i,j].xaxis.set_minor_locator(MultipleLocator(5))
-            ax[i,j].yaxis.set_major_locator(MultipleLocator(10))
-            ax[i,j].yaxis.set_minor_locator(MultipleLocator(5))
+            ax[i,j].xaxis.set_major_locator(MultipleLocator(50))
+            ax[i,j].xaxis.set_minor_locator(MultipleLocator(10))
+            ax[i,j].yaxis.set_major_locator(MultipleLocator(50))
+            ax[i,j].yaxis.set_minor_locator(MultipleLocator(10))
             ax[i,j].set_xlabel('Eastward Range from Radar (km)')
             ax[i,j].set_ylabel('Northward Range from Radar (km)')
             ax[i,j].grid(which='major')
 
         # Color bars
-        cax = []
-        for i in range(ax.shape[0]):
-            cax.append(
-                make_axes([axis for axis in ax[i].flat], location='right',
-                          pad=0.01, fraction=0.01, shrink=1.0, aspect=20))
-        fig.colorbar(mappable=qma, cax=cax[0][0], ticks=ticks_refl)
-        fig.colorbar(mappable=qmb, cax=cax[1][0], ticks=ticks_vdop)
-        fig.colorbar(mappable=qmc, cax=cax[2][0], ticks=ticks_ncp)
-        fig.colorbar(mappable=qmd, cax=cax[3][0], ticks=ticks_rhv)
-        fig.colorbar(mappable=qme, cax=cax[4][0], ticks=ticks_sw)
-        fig.colorbar(mappable=qmf, cax=cax[5][0], ticks=ticks_phi)
+        plt.colorbar(mappable=qma, cax=fig.add_axes([0.91, 0.68, 0.008, 0.2]),
+                     ticks=ticks_refl)
+        plt.colorbar(mappable=qmb, cax=fig.add_axes([0.91, 0.40, 0.008, 0.2]),
+                     ticks=ticks_vdop)
+        plt.colorbar(mappable=qmc, cax=fig.add_axes([0.91, 0.12, 0.008, 0.2]),
+                     ticks=ticks_sw)
 
         # Save figure
-        date_stamp = num2date(radar.time['data'].min(), radar.time['units'])
+        date_stamp = num2date(radar.time['data'][:].min(), radar.time['units'])
         filename = '{}.png'.format(date_stamp.strftime('%Y%m%d.%H%M%S'))
         fig.savefig(os.path.join(outdir, filename), format='png', dpi=dpi,
                     bbox_inches='tight')
@@ -207,13 +178,13 @@ if __name__ == '__main__':
                         help=None)
     parser.add_argument('-v', '--verbose', nargs='?', type=bool, const=True,
                         default=False, help=None)
-    parser.add_argument('-db', '--debug', nargs='?', type=bool, const=True,
+    parser.add_argument('--debug', nargs='?', type=bool, const=True,
                         default=False, help=None)
     args = parser.parse_args()
 
     if args.debug:
-        print 'inpdir = %s' % args.inpdir
-        print 'outdir = %s' % args.outdir
+        print 'source = %s' % args.inpdir
+        print 'output = %s' % args.outdir
         print 'stamp = %s' % args.stamp
         print 'dpi = %i' % args.dpi
 
@@ -222,5 +193,5 @@ if __name__ == '__main__':
         print 'MAX_RANGE = %.2f' % MAX_RANGE
 
     # Call desired plotting function
-    multipanel(args.inpdir, args.outdir, args.stamp, dpi=args.dpi,
-               verbose=args.verbose)
+    multipanel_V03(args.inpdir, args.outdir, args.stamp, dpi=args.dpi,
+                   verbose=args.verbose)
