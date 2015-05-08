@@ -16,10 +16,11 @@ from pyart.graph import cm
 from pyart.io import read_cfradial
 
 
-EXCLUDE_FIELDS = None
-
 # Define the hours to plot
 HOURS = np.arange(0, 24, 1)
+
+# Define radar fields to exclude from the radar object
+EXCLUDE_FIELDS = None
 
 # Define radar fields
 REFL_FIELD = 'reflectivity_copol'

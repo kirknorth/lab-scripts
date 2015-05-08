@@ -19,7 +19,7 @@ from pyart.config import get_field_name
 SWEEPS = [0, 1, 2, 3, 5, 8, 10, 13]
 
 # Define max range to plot
-MAX_RANGE = 50.0
+MAX_RANGE = 180.0
 
 # Define radar fields
 REFL_FIELD = get_field_name('reflectivity')
@@ -41,17 +41,17 @@ CMAP_PHIDP = plt.get_cmap(name='jet')
 # Normalize colour maps
 NORM_REFL = BoundaryNorm(np.arange(-10, 62, 2), CMAP_REFL.N)
 NORM_VDOP = BoundaryNorm(np.arange(-32, 34, 2), CMAP_VDOP.N)
-NORM_WIDTH = BoundaryNorm(np.arange(0, 10.1, 0.1), CMAP_WIDTH.N)
+NORM_WIDTH = BoundaryNorm(np.arange(0, 8.1, 0.1), CMAP_WIDTH.N)
 NORM_RHOHV = BoundaryNorm(np.arange(0.7, 1.01, 0.01), CMAP_RHOHV.N)
-NORM_ZDR = BoundaryNorm(np.arange(0, 4.1, 0.1), CMAP_ZDR.N)
+NORM_ZDR = BoundaryNorm(np.arange(-2, 3.1, 0.1), CMAP_ZDR.N)
 NORM_PHIDP = BoundaryNorm(np.arange(0, 181, 1), CMAP_PHIDP.N)
 
 # Define colour bar ticks
 TICKS_REFL = np.arange(-10, 70, 10)
 TICKS_VDOP = np.arange(-32, 40, 8)
-TICKS_WIDTH = np.arange(0, 11, 1)
+TICKS_WIDTH = np.arange(0, 9, 1)
 TICKS_RHOHV = np.arange(0.7, 1.05, 0.05)
-TICKS_ZDR = np.arange(0, 4.5, 0.5)
+TICKS_ZDR = np.arange(-2, 3.5, 0.5)
 TICKS_PHIDP = np.arange(0, 200, 20)
 
 
@@ -133,9 +133,9 @@ def multipanel(radar, outdir, dpi=100, verbose=False):
 
     # Format plot axes
     for i, j in np.ndindex(ax.shape):
-        ax[i,j].xaxis.set_major_locator(MultipleLocator(50))
+        ax[i,j].xaxis.set_major_locator(MultipleLocator(40))
         ax[i,j].xaxis.set_minor_locator(MultipleLocator(10))
-        ax[i,j].yaxis.set_major_locator(MultipleLocator(50))
+        ax[i,j].yaxis.set_major_locator(MultipleLocator(40))
         ax[i,j].yaxis.set_minor_locator(MultipleLocator(10))
         ax[i,j].set_xlabel('Eastward Range from Radar (km)')
         ax[i,j].set_ylabel('Northward Range from Radar (km)')
