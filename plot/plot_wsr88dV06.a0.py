@@ -2,7 +2,6 @@
 
 import os
 import argparse
-import multiprocessing
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -13,57 +12,49 @@ from matplotlib.colorbar import make_axes
 from matplotlib.ticker import MultipleLocator
 
 from pyart.graph import cm
-from pyart.io import read_mdv
+from pyart.aux_io import read_radx
 from pyart.config import get_field_name
 
-# Define sweeps to be plotted
+# Define sweeps to plot
 SWEEPS = [0, 1, 2]
 
-# Define field names
-REFL_FIELD = get_field_name('reflectivity')
-VDOP_FIELD = get_field_name('velocity')
-WIDTH_FIELD = get_field_name('spectrum_width')
-RHOHV_FIELD = get_field_name('cross_correlation_ratio')
-ZDR_FIELD = get_field_name('differential_reflectivity')
-PHIDP_FIELD = get_field_name('differential_phase')
-NCP_FIELD = get_field_name('normalized_coherent_power')
+# Define max range to plot
+MAX_RANGE = 180.0
 
-# Define fields to exclude from radar object
-EXCLUDE_FIELDS = [
-    'corrected_reflectivity',
-    'radar_echo_classification',
-    'corrected_differential_reflectivity'
-    ]
+# Define radar fields
+REFL_FIELD = 'REF'
+VDOP_FIELD = 'VEL'
+WIDTH_FIELD = 'SW'
+RHOHV_FIELD = 'RHO'
+ZDR_FIELD = 'ZDR'
+PHIDP_FIELD = 'PHI'
 
 # Define colour maps
 CMAP_REFL = cm.NWSRef
-CMAP_VDOP = plt.get_cmap('jet')
-CMAP_WIDTH = plt.get_cmap('jet')
-CMAP_RHOHV = plt.get_cmap('jet')
-CMAP_ZDR = plt.get_cmap('jet')
-CMAP_PHIDP = plt.get_cmap('jet')
-CMAP_NCP = plt.get_cmap('jet')
+CMAP_VDOP = plt.get_cmap(name='jet')
+CMAP_WIDTH = plt.get_cmap(name='jet')
+CMAP_RHOHV = plt.get_cmap(name='jet')
+CMAP_ZDR = plt.get_cmap(name='jet')
+CMAP_PHIDP = plt.get_cmap(name='jet')
 
 # Normalize colour maps
-NORM_REFL = BoundaryNorm(np.arange(-5, 56, 1), CMAP_REFL.N)
-NORM_VDOP = BoundaryNorm(np.arange(-16, 17, 1), CMAP_VDOP.N)
-NORM_WIDTH = BoundaryNorm(np.arange(0, 8.5, 0.5), CMAP_WIDTH.N)
-NORM_RHOHV = BoundaryNorm(np.arange(0, 1.1, 0.1), CMAP_RHOHV.N)
+NORM_REFL = BoundaryNorm(np.arange(-5, 66, 1), CMAP_REFL.N)
+NORM_VDOP = BoundaryNorm(np.arange(-25, 26, 1), CMAP_VDOP.N)
+NORM_WIDTH = BoundaryNorm(np.arange(0, 8.1, 0.1), CMAP_WIDTH.N)
+NORM_RHOHV = BoundaryNorm(np.arange(0, 1.01, 0.01), CMAP_RHOHV.N)
 NORM_ZDR = BoundaryNorm(np.arange(-5, 5.1, 0.1), CMAP_ZDR.N)
-NORM_PHIDP = BoundaryNorm(np.arange(-180, 185, 5), CMAP_PHIDP.N)
-NORM_NCP = BoundaryNorm(np.arange(0, 1.05, 0.05), CMAP_NCP.N)
+NORM_PHIDP = BoundaryNorm(np.arange(0, 181, 1), CMAP_PHIDP.N)
 
 # Define colour bar ticks
-TICKS_REFL = np.arange(-5, 65, 10)
-TICKS_VDOP = np.arange(-16, 20, 4)
+TICKS_REFL = np.arange(-5, 75, 10)
+TICKS_VDOP = np.arange(-25, 30, 5)
 TICKS_WIDTH = np.arange(0, 9, 1)
 TICKS_RHOHV = np.arange(0, 1.1, 0.1)
 TICKS_ZDR = np.arange(-5, 6, 1)
-TICKS_PHIDP = np.arange(-180, 220, 40)
-TICKS_NCP = np.arange(0, 1.1, 0.1)
+TICKS_PHIDP = np.arange(0, 200, 20)
 
 
-def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
+def multipanel(radar, outdir, dpi=100, debug=False, verbose=False):
     """
     """
 
@@ -85,9 +76,10 @@ def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
     rcParams['ytick.minor.width'] = 1
 
     # Create figure instance
-    subs = {'xlim': (-117, 117), 'ylim': (-117, 117)}
+    subs = {'xlim': (-MAX_RANGE, MAX_RANGE),
+            'ylim': (-MAX_RANGE, MAX_RANGE)}
     figs = {'figsize': (50, 25)}
-    fig, ax = plt.subplots(nrows=len(SWEEPS), ncols=7, subplot_kw=subs, **figs)
+    fig, ax = plt.subplots(nrows=len(SWEEPS), ncols=6, subplot_kw=subs, **figs)
 
     if debug:
         print 'Number of sweeps: {}'.format(radar.nsweeps)
@@ -113,7 +105,7 @@ def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
             radar, WIDTH_FIELD, sweep=sweep, cmap=CMAP_WIDTH, norm=NORM_WIDTH,
             fig=fig, ax=ax[i,2])
 
-        # (d) Copolar correlation coefficient
+        # (d) Copolar Correlation coefficient
         qmd = _pcolormesh(
             radar, RHOHV_FIELD, sweep=sweep, cmap=CMAP_RHOHV, norm=NORM_RHOHV,
             fig=fig, ax=ax[i,3])
@@ -128,26 +120,11 @@ def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
             radar, PHIDP_FIELD, sweep=sweep, cmap=CMAP_PHIDP, norm=NORM_PHIDP,
             fig=fig, ax=ax[i,5])
 
-        # (g) Normalized coherent power
-        qmg = _pcolormesh(
-            radar, NCP_FIELD, sweep=sweep, cmap=CMAP_NCP, norm=NORM_NCP,
-            fig=fig, ax=ax[i,6])
-
-    # Format plot axes
-    for i, j in np.ndindex(ax.shape):
-        ax[i,j].xaxis.set_major_locator(MultipleLocator(20))
-        ax[i,j].xaxis.set_minor_locator(MultipleLocator(5))
-        ax[i,j].yaxis.set_major_locator(MultipleLocator(20))
-        ax[i,j].yaxis.set_minor_locator(MultipleLocator(5))
-        ax[i,j].set_xlabel('Eastward Range from Radar (km)')
-        ax[i,j].set_ylabel('Northward Range from Radar (km)')
-        ax[i,j].grid(which='major')
-
-    # Create color bars
+    # Create colour bars
     cax = []
     for i in range(ax.shape[1]):
         cax.append(
-            make_axes([axis for axis in ax[:,i].flat], location='right',
+            make_axes([axis for axis in ax[:,i].flat], location='bottom',
                       pad=0.04, fraction=0.01, shrink=1.0, aspect=20))
     fig.colorbar(mappable=qma, cax=cax[0][0], orientation='horizontal',
                  ticks=TICKS_REFL)
@@ -161,9 +138,16 @@ def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
                  ticks=TICKS_ZDR)
     fig.colorbar(mappable=qmf, cax=cax[5][0], orientation='horizontal',
                  ticks=TICKS_PHIDP)
-    fig.colorbar(mappable=qmg, cax=cax[6][0], orientation='horizontal',
-                 ticks=TICKS_NCP)
 
+    # Format plot axes
+    for i, j in np.ndindex(ax.shape):
+        ax[i,j].xaxis.set_major_locator(MultipleLocator(40))
+        ax[i,j].xaxis.set_minor_locator(MultipleLocator(10))
+        ax[i,j].yaxis.set_major_locator(MultipleLocator(40))
+        ax[i,j].yaxis.set_minor_locator(MultipleLocator(10))
+        ax[i,j].set_xlabel('Eastward Range from Radar (km)')
+        ax[i,j].set_ylabel('Northward Range from Radar (km)')
+        ax[i,j].grid(which='major')
 
     # Define image file name
     date_stamp = _datetimes(radar).min().strftime('%Y%m%d.%H%M%S')
@@ -184,7 +168,7 @@ def _pcolormesh(
     """
     """
 
-    # Parse figure and axis
+    # Parse axis and figure parameters
     if fig is None:
         fig = plt.gcf()
     if ax is None:
@@ -192,20 +176,23 @@ def _pcolormesh(
 
     # Parse colour map
     if cmap is None:
-        cmap = plt.get_cmap('jet')
+        cmap = plt.get_cmap(name='jet')
 
     # Parse radar coordinates
     # Convert angles to radians and range to kilometers
     rng = radar.range['data'] / 1000.0
     azi = np.radians(radar.get_azimuth(sweep))
 
+    # Compute index of maximum range
+    rf = np.abs(rng - MAX_RANGE).argmin() + 1
+
     # Compute radar sweep coordinates
-    AZI, RNG = np.meshgrid(azi, rng, indexing='ij')
+    AZI, RNG = np.meshgrid(azi, rng[:rf], indexing='ij')
     X = RNG * np.sin(AZI)
     Y = RNG * np.cos(AZI)
 
     # Parse radar data
-    data = radar.get_field(sweep, field)
+    data = radar.get_field(sweep, field)[:,:rf]
 
     # Create quadmesh
     qm = ax.pcolormesh(
@@ -245,19 +232,24 @@ if __name__ == '__main__':
                         default=False, help=None)
     args = parser.parse_args()
 
-    # Parse files to plot
-    files = [os.path.join(args.inpdir, f) for f in
-             sorted(os.listdir(args.inpdir)) if args.stamp in f]
+    if args.debug:
+        print 'MAX_RANGE -> {}'.format(MAX_RANGE)
+
+    # Parse radar files to plot
+    files = [os.path.join(args.inpdir, f) for f
+             in sorted(os.listdir(args.inpdir)) if args.stamp in f]
+
     if args.verbose:
         print 'Number of files to plot: {}'.format(len(files))
 
     # Loop over all files
     for filename in files:
+
         if args.verbose:
             print 'Plotting file: {}'.format(os.path.basename(filename))
 
         # Read radar data
-        radar = read_mdv(filename, exclude_fields=EXCLUDE_FIELDS)
+        radar = read_radx(filename)
 
         # Call desired plotting function
         multipanel(radar, args.outdir, dpi=args.dpi, debug=args.debug,
