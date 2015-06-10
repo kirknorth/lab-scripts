@@ -59,6 +59,12 @@ def multipanel(filename, outdir, dpi=100, verbose=False):
     """
 
     # Set figure parameters
+    rcParams['font.size'] = 14
+    rcParams['font.weight'] = 'bold'
+    rcParams['axes.titlesize'] = 14
+    rcParams['axes.titleweight'] = 'bold'
+    rcParams['axes.labelsize'] = 14
+    rcParams['axes.labelweight'] = 'bold'
     rcParams['axes.linewidth'] = 1.5
     rcParams['xtick.major.size'] = 4
     rcParams['xtick.major.width'] = 1

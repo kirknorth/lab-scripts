@@ -1,8 +1,15 @@
 #!/usr/bin/python
+#
+# Due to the way NEXRAD WSR-88D radars are run, lower elevation angles in the
+# volume may have missing Doppler data (e.g., Doppler velocity and spectrum
+# width), while others may be missing polarization data. The reason for this
+# is the compromise between offering power measurements (e.g., reflectivity)
+# at long ranges (e.g., 300+ km) at low levels, providing realiable Doppler
+# measurements (e.g., large Nyquist velocity), and minimizing data collection
+# time.
 
 import os
 import argparse
-import multiprocessing
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -16,7 +23,9 @@ from pyart.graph import cm
 from pyart.config import get_field_name
 
 # Define sweeps to plot
-SWEEPS = [0, 1, 2, 3, 5, 8, 10, 13]
+SWEEPS_POWER = [0, 2, 4, 6, 11]
+SWEEPS_DOPPLER = [1, 3, 4, 6, 11]
+SWEEPS = zip(SWEEPS_POWER, SWEEPS_DOPPLER)
 
 # Define max range to plot
 MAX_RANGE = 180.0
@@ -29,6 +38,7 @@ WIDTH_FIELD = get_field_name('spectrum_width')
 RHOHV_FIELD = get_field_name('cross_correlation_ratio')
 ZDR_FIELD = get_field_name('differential_reflectivity')
 PHIDP_FIELD = get_field_name('differential_phase')
+DETECT_FIELD = 'significant_detection_mask'
 
 # Define colour maps
 CMAP_REFL = cm.NWSRef
@@ -37,29 +47,38 @@ CMAP_WIDTH = plt.get_cmap(name='jet')
 CMAP_RHOHV = plt.get_cmap(name='jet')
 CMAP_ZDR = plt.get_cmap(name='jet')
 CMAP_PHIDP = plt.get_cmap(name='jet')
+CMAP_MASK = plt.get_cmap(name='bone_r')
 
 # Normalize colour maps
-NORM_REFL = BoundaryNorm(np.arange(-10, 62, 2), CMAP_REFL.N)
-NORM_VDOP = BoundaryNorm(np.arange(-32, 34, 2), CMAP_VDOP.N)
-NORM_WIDTH = BoundaryNorm(np.arange(0, 8.1, 0.1), CMAP_WIDTH.N)
-NORM_RHOHV = BoundaryNorm(np.arange(0.7, 1.01, 0.01), CMAP_RHOHV.N)
-NORM_ZDR = BoundaryNorm(np.arange(-2, 3.1, 0.1), CMAP_ZDR.N)
-NORM_PHIDP = BoundaryNorm(np.arange(0, 181, 1), CMAP_PHIDP.N)
+NORM_REFL = BoundaryNorm(np.arange(-5, 56, 1), CMAP_REFL.N)
+NORM_VDOP = BoundaryNorm(np.arange(-25, 26, 1), CMAP_VDOP.N)
+NORM_WIDTH = BoundaryNorm(np.arange(0, 8.5, 0.5), CMAP_WIDTH.N)
+NORM_RHOHV = BoundaryNorm(np.arange(0, 1.01, 0.01), CMAP_RHOHV.N)
+NORM_ZDR = BoundaryNorm(np.arange(-5, 5.5, 0.5), CMAP_ZDR.N)
+NORM_PHIDP = BoundaryNorm(np.arange(0, 185, 5), CMAP_PHIDP.N)
+NORM_MASK = BoundaryNorm(np.arange(0, 3, 1), CMAP_MASK.N)
 
 # Define colour bar ticks
-TICKS_REFL = np.arange(-10, 70, 10)
-TICKS_VDOP = np.arange(-32, 40, 8)
+TICKS_REFL = np.arange(-5, 60, 5)
+TICKS_VDOP = np.arange(-25, 30, 5)
 TICKS_WIDTH = np.arange(0, 9, 1)
-TICKS_RHOHV = np.arange(0.7, 1.05, 0.05)
-TICKS_ZDR = np.arange(-2, 3.5, 0.5)
+TICKS_RHOHV = np.arange(0, 1.2, 0.2)
+TICKS_ZDR = np.arange(-5, 6, 1)
 TICKS_PHIDP = np.arange(0, 200, 20)
+TICKS_MASK = np.arange(0, 3, 1)
 
 
-def multipanel(radar, outdir, dpi=100, verbose=False):
+def multipanel(radar, outdir, dpi=100, debug=False, verbose=False):
     """
     """
 
     # Set figure parameters
+    rcParams['font.size'] = 14
+    rcParams['font.weight'] = 'bold'
+    rcParams['axes.titlesize'] = 14
+    rcParams['axes.titleweight'] = 'bold'
+    rcParams['axes.labelsize'] = 14
+    rcParams['axes.labelweight'] = 'bold'
     rcParams['axes.linewidth'] = 1.5
     rcParams['xtick.major.size'] = 4
     rcParams['xtick.major.width'] = 1
@@ -73,63 +92,77 @@ def multipanel(radar, outdir, dpi=100, verbose=False):
     # Create figure instance
     subs = {'xlim': (-MAX_RANGE, MAX_RANGE),
             'ylim': (-MAX_RANGE, MAX_RANGE)}
-    figs = {'figsize': (59, 49)}
-    fig, ax = plt.subplots(nrows=7, ncols=len(SWEEPS), subplot_kw=subs, **figs)
+    figs = {'figsize': (60, 37)}
+    fig, ax = plt.subplots(nrows=len(SWEEPS), ncols=8, subplot_kw=subs, **figs)
 
     # Iterate over each sweep
-    for j, sweep in enumerate(SWEEPS):
+    for i, sweep in enumerate(SWEEPS):
 
         if verbose:
             print 'Plotting sweep: {}'.format(sweep)
 
         # (a) Reflectivity
         qma = _pcolormesh(
-            radar, REFL_FIELD, sweep=sweep, cmap=CMAP_REFL, norm=NORM_REFL,
-            ticks=TICKS_REFL, fig=fig, ax=ax[0,j])
+            radar, REFL_FIELD, sweep=sweep[0], cmap=CMAP_REFL, norm=NORM_REFL,
+            fig=fig, ax=ax[i,0])
 
         # (b) Uncorrected Doppler velocity
         qmb = _pcolormesh(
-            radar, VDOP_FIELD, sweep=sweep, cmap=CMAP_VDOP, norm=NORM_VDOP,
-            ticks=TICKS_VDOP, fig=fig, ax=ax[1,j])
+            radar, VDOP_FIELD, sweep=sweep[1], cmap=CMAP_VDOP, norm=NORM_VDOP,
+            fig=fig, ax=ax[i,1])
 
         # (c) Corrected Doppler velocity
         qmc = _pcolormesh(
-            radar, CORR_VDOP_FIELD, sweep=sweep, cmap=CMAP_VDOP,
-            norm=NORM_VDOP, ticks=TICKS_VDOP, fig=fig, ax=ax[2,j])
+            radar, CORR_VDOP_FIELD, sweep=sweep[1], cmap=CMAP_VDOP,
+            norm=NORM_VDOP, fig=fig, ax=ax[i,2])
 
         # (d) Spectrum width
         qmd = _pcolormesh(
-            radar, WIDTH_FIELD, sweep=sweep, cmap=CMAP_WIDTH, norm=NORM_WIDTH,
-            ticks=TICKS_WIDTH, fig=fig, ax=ax[3,j])
+            radar, WIDTH_FIELD, sweep=sweep[1], cmap=CMAP_WIDTH,
+            norm=NORM_WIDTH, fig=fig, ax=ax[i,3])
 
         # (e) Copolar Correlation coefficient
         qme = _pcolormesh(
-            radar, RHOHV_FIELD, sweep=sweep, cmap=CMAP_RHOHV, norm=NORM_RHOHV,
-            ticks=TICKS_RHOHV, fig=fig, ax=ax[4,j])
+            radar, RHOHV_FIELD, sweep=sweep[0], cmap=CMAP_RHOHV,
+            norm=NORM_RHOHV, fig=fig, ax=ax[i,4])
 
         # (f) Differential reflectivity
         qmf = _pcolormesh(
-            radar, ZDR_FIELD, sweep=sweep, cmap=CMAP_ZDR, norm=NORM_ZDR,
-            ticks=TICKS_ZDR, fig=fig, ax=ax[5,j])
+            radar, ZDR_FIELD, sweep=sweep[0], cmap=CMAP_ZDR, norm=NORM_ZDR,
+            fig=fig, ax=ax[i,5])
 
         # (g) Differential phase
         qmg = _pcolormesh(
-            radar, PHIDP_FIELD, sweep=sweep, cmap=CMAP_PHIDP, norm=NORM_PHIDP,
-            ticks=TICKS_PHIDP, fig=fig, ax=ax[6,j])
+            radar, PHIDP_FIELD, sweep=sweep[0], cmap=CMAP_PHIDP,
+            norm=NORM_PHIDP, fig=fig, ax=ax[i,6])
+
+        # (h) Significant detection mask
+        qmh = _pcolormesh(
+            radar, DETECT_FIELD, sweep=sweep[0], cmap=CMAP_MASK,
+            norm=NORM_MASK, fig=fig, ax=ax[i,7])
 
     # Create colour bars
     cax = []
-    for i in range(ax.shape[0]):
+    for i in range(ax.shape[1]):
         cax.append(
-            make_axes([axis for axis in ax[i].flat], location='right',
-                      pad=0.01, fraction=0.01, shrink=1.0, aspect=20))
-    fig.colorbar(mappable=qma, cax=cax[0][0], ticks=TICKS_REFL)
-    fig.colorbar(mappable=qmb, cax=cax[1][0], ticks=TICKS_VDOP)
-    fig.colorbar(mappable=qmc, cax=cax[2][0], ticks=TICKS_VDOP)
-    fig.colorbar(mappable=qmd, cax=cax[3][0], ticks=TICKS_WIDTH)
-    fig.colorbar(mappable=qme, cax=cax[4][0], ticks=TICKS_RHOHV)
-    fig.colorbar(mappable=qmf, cax=cax[5][0], ticks=TICKS_ZDR)
-    fig.colorbar(mappable=qmg, cax=cax[6][0], ticks=TICKS_PHIDP)
+            make_axes([axis for axis in ax[:,i].flat], location='bottom',
+                      pad=0.03, fraction=0.01, shrink=1.0, aspect=20))
+    fig.colorbar(mappable=qma, cax=cax[0][0], orientation='horizontal',
+                 ticks=TICKS_REFL)
+    fig.colorbar(mappable=qmb, cax=cax[1][0], orientation='horizontal',
+                 ticks=TICKS_VDOP)
+    fig.colorbar(mappable=qmc, cax=cax[2][0], orientation='horizontal',
+                 ticks=TICKS_VDOP)
+    fig.colorbar(mappable=qmd, cax=cax[3][0], orientation='horizontal',
+                 ticks=TICKS_WIDTH)
+    fig.colorbar(mappable=qme, cax=cax[4][0], orientation='horizontal',
+                 ticks=TICKS_RHOHV)
+    fig.colorbar(mappable=qmf, cax=cax[5][0], orientation='horizontal',
+                 ticks=TICKS_ZDR)
+    fig.colorbar(mappable=qmg, cax=cax[6][0], orientation='horizontal',
+                 ticks=TICKS_PHIDP)
+    fig.colorbar(mappable=qmh, cax=cax[7][0], orientation='horizontal',
+                 ticks=TICKS_MASK)
 
     # Format plot axes
     for i, j in np.ndindex(ax.shape):
@@ -141,18 +174,20 @@ def multipanel(radar, outdir, dpi=100, verbose=False):
         ax[i,j].set_ylabel('Northward Range from Radar (km)')
         ax[i,j].grid(which='major')
 
-    # Save figure
+    # Define image file name
     date_stamp = _datetimes(radar).min().strftime('%Y%m%d.%H%M%S')
-    filename = '{}.png'.format(date_stamp)
-    fig.savefig(os.path.join(outdir, filename), format='png', dpi=dpi,
+    fname = '{}.png'.format(date_stamp)
+
+    # Save figure
+    fig.savefig(os.path.join(outdir, fname), format='png', dpi=dpi,
                 bbox_inches='tight')
+
+    # Close figure to free memory
     plt.close(fig)
 
-    return
 
-
-def _pcolormesh(radar, field, sweep=0, cmap=None, norm=None, ticks=None,
-                fig=None, ax=None):
+def _pcolormesh(
+        radar, field, sweep=0, cmap=None, norm=None, fig=None, ax=None):
     """
     """
 
@@ -162,38 +197,36 @@ def _pcolormesh(radar, field, sweep=0, cmap=None, norm=None, ticks=None,
     if ax is None:
         ax = plt.gca()
 
-    # Parse colour map
-    if cmap is None:
-        cmap = plt.get_cmap(name='jet')
-
     # Parse sweep data
     s0 = radar.variables['sweep_start_ray_index'][sweep]
-    sn = radar.variables['sweep_end_ray_index'][sweep]
+    sf = radar.variables['sweep_end_ray_index'][sweep] + 1
 
     # Parse radar coordinates
     # Convert angles to radians and range to kilometers
     rng = radar.variables['range'][:] / 1000.0
-    azi = np.radians(radar.variables['azimuth'][s0:sn+1])
+    azi = np.radians(radar.variables['azimuth'][s0:sf])
 
     # Compute index of maximum range
-    rn = np.abs(rng - MAX_RANGE).argmin()
+    rf = np.abs(rng - MAX_RANGE).argmin() + 1
 
     # Compute radar sweep coordinates
-    AZI, RNG = np.meshgrid(azi, rng[:rn+1], indexing='ij')
+    AZI, RNG = np.meshgrid(azi, rng[:rf], indexing='ij')
     X = RNG * np.sin(AZI)
     Y = RNG * np.cos(AZI)
 
     # Parse radar data
-    data = radar.variables[field][s0:sn+1,:rn+1]
+    data = radar.variables[field][s0:sf,:rf]
 
     # Create quadmesh
-    qm = ax.pcolormesh(X, Y, data, cmap=cmap, norm=norm, shading='flat')
+    qm = ax.pcolormesh(
+        X, Y, data, cmap=cmap, norm=norm, shading='flat', alpha=None,
+        rasterized=True)
 
     # Create title
-    time_sweep = _datetimes(radar)[(s0 + sn) / 2]
+    sweep_time = _datetimes(radar)[(s0 + sf) / 2]
     title = '{} {:.1f} deg {}Z\n{}'.format(
             radar.instrument_name, radar.variables['fixed_angle'][sweep],
-            time_sweep.isoformat(), radar.variables[field].long_name)
+            sweep_time.isoformat(), field)
     ax.set_title(title)
 
     return qm

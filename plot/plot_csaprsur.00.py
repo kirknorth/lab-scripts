@@ -2,7 +2,6 @@
 
 import os
 import argparse
-import multiprocessing
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -45,21 +44,21 @@ CMAP_PHIDP = plt.get_cmap('jet')
 CMAP_NCP = plt.get_cmap('jet')
 
 # Normalize colour maps
-NORM_REFL = BoundaryNorm(np.arange(-5, 56, 1), CMAP_REFL.N)
+NORM_REFL = BoundaryNorm(np.arange(-10, 51, 1), CMAP_REFL.N)
 NORM_VDOP = BoundaryNorm(np.arange(-16, 17, 1), CMAP_VDOP.N)
 NORM_WIDTH = BoundaryNorm(np.arange(0, 8.5, 0.5), CMAP_WIDTH.N)
 NORM_RHOHV = BoundaryNorm(np.arange(0, 1.1, 0.1), CMAP_RHOHV.N)
 NORM_ZDR = BoundaryNorm(np.arange(-5, 5.1, 0.1), CMAP_ZDR.N)
-NORM_PHIDP = BoundaryNorm(np.arange(-180, 185, 5), CMAP_PHIDP.N)
+NORM_PHIDP = BoundaryNorm(np.arange(-180, 1, 1), CMAP_PHIDP.N)
 NORM_NCP = BoundaryNorm(np.arange(0, 1.05, 0.05), CMAP_NCP.N)
 
 # Define colour bar ticks
-TICKS_REFL = np.arange(-5, 65, 10)
+TICKS_REFL = np.arange(-10, 60, 10)
 TICKS_VDOP = np.arange(-16, 20, 4)
 TICKS_WIDTH = np.arange(0, 9, 1)
 TICKS_RHOHV = np.arange(0, 1.1, 0.1)
 TICKS_ZDR = np.arange(-5, 6, 1)
-TICKS_PHIDP = np.arange(-180, 220, 40)
+TICKS_PHIDP = np.arange(-180, 20, 20)
 TICKS_NCP = np.arange(0, 1.1, 0.1)
 
 
@@ -86,7 +85,7 @@ def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
 
     # Create figure instance
     subs = {'xlim': (-117, 117), 'ylim': (-117, 117)}
-    figs = {'figsize': (50, 25)}
+    figs = {'figsize': (55, 25)}
     fig, ax = plt.subplots(nrows=len(SWEEPS), ncols=7, subplot_kw=subs, **figs)
 
     if debug:
@@ -147,7 +146,7 @@ def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
     cax = []
     for i in range(ax.shape[1]):
         cax.append(
-            make_axes([axis for axis in ax[:,i].flat], location='right',
+            make_axes([axis for axis in ax[:,i].flat], location='bottom',
                       pad=0.04, fraction=0.01, shrink=1.0, aspect=20))
     fig.colorbar(mappable=qma, cax=cax[0][0], orientation='horizontal',
                  ticks=TICKS_REFL)
@@ -163,7 +162,6 @@ def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
                  ticks=TICKS_PHIDP)
     fig.colorbar(mappable=qmg, cax=cax[6][0], orientation='horizontal',
                  ticks=TICKS_NCP)
-
 
     # Define image file name
     date_stamp = _datetimes(radar).min().strftime('%Y%m%d.%H%M%S')
