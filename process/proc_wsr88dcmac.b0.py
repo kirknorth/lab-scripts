@@ -11,7 +11,6 @@ from datetime import datetime
 
 from pyart.io import read_cfradial, write_grid
 from pyart.config import get_fillvalue, get_field_name
-from pyart.correct import dealias_region_based
 
 from grid.interp import mapper
 
@@ -23,7 +22,7 @@ DL = 'b1'
 FACILITY = 'KVNX: Vance AFB, Oklahoma'
 
 # Define k-d tree parameters
-NUM_NEIGHBORS = 50
+NUM_NEIGHBORS = 100
 LEAFSIZE = 10
 
 # Radar data objective analysis parameters
@@ -80,6 +79,9 @@ FIELDS = [
     PHIDP_FIELD,
     ]
 
+# Grid Quality index field
+QUALITY_INDEX = REFL_FIELD
+
 # Fields to exclude from radar object
 EXCLUDE_FIELDS = None
 
@@ -97,6 +99,9 @@ def process_file(filename, outdir, debug=False, verbose=False):
     if verbose:
         print 'Processing file: {}'.format(os.path.basename(filename))
 
+    if debug:
+        print 'Number of sweeps: {}'.format(radar.nsweeps)
+
     # Create radar data objective analysis weight
     weight = mapper.Weight(
         radar, cutoff_radius=CUTOFF_RADIUS, kappa_star=KAPPA_STAR,
@@ -104,10 +109,10 @@ def process_file(filename, outdir, debug=False, verbose=False):
 
     # Grid radar data
     grid = mapper.grid_radar(
-        radar, GRID_COORDS[DOMAIN], weight=weight, fields=FIELDS, lat_0=LAT_0,
-        lon_0=LON_0, alt_0=ALT_0, toa=TOA, max_range=MAX_RANGE,
-        k=NUM_NEIGHBORS, leafsize=LEAFSIZE, eps=0.0, debug=debug,
-        verbose=verbose)
+        radar, GRID_COORDS[DOMAIN], weight=weight, fields=FIELDS,
+        quality_index=QUALITY_INDEX, lat_0=LAT_0, lon_0=LON_0, alt_0=ALT_0,
+        toa=TOA, max_range=MAX_RANGE, k=NUM_NEIGHBORS, leafsize=LEAFSIZE,
+        eps=0.0, debug=debug, verbose=verbose)
 
     # Add new metadata
     _add_metadata(grid, filename)

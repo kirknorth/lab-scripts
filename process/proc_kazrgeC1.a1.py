@@ -26,6 +26,7 @@ VDOP_COHER_BINS, VDOP_COHER_LIMITS = 100, (0, 8)
 
 # Doppler velocity correction routine
 DEALIAS = 'region'
+INTERVAL_SPLITS = 5
 
 # Define output NetCDF format
 FORMAT = 'NETCDF4'
@@ -49,7 +50,7 @@ def process_file(filename, outdir, dl='b1', verbose=False):
     # Read radar data
     radar = read_kazr(filename, exclude_fields=None)
 
-    # Radar significant detection
+    # Step 1: Radar significant detection
     # Includes Hildebrand noise floor estimate and Doppler velocity coherency
     gf = noise.velocity_coherency(
         radar, gatefilter=None, num_bins=VDOP_COHER_BINS,
@@ -68,7 +69,7 @@ def process_file(filename, outdir, dl='b1', verbose=False):
         dilate=False, structure=None, rays_wrap_around=False, ncp_field=None,
         detect_field=None, verbose=verbose)
 
-    # Doppler velocity correction
+    # Step 2: Doppler velocity correction
     if DEALIAS == 'phase':
         vdop_corr = dealias_unwrap_phase(
             radar, gatefilter=gf, unwrap_unit='sweep', nyquist_vel=None,
@@ -77,17 +78,18 @@ def process_file(filename, outdir, dl='b1', verbose=False):
 
     elif DEALIAS == 'region':
         vdop_corr = dealias_region_based(
-            radar, gatefilter=gf, interval_splits=3, interval_limits=None,
-            skip_between_rays=2, skip_along_ray=2, centered=True,
-            nyquist_vel=None, rays_wrap_around=False, keep_original=False,
-            vel_field=VDOP_FIELD, corr_vel_field=None)
+            radar, gatefilter=gf, interval_splits=INTERVAL_SPLITS,
+            interval_limits=None, skip_between_rays=2, skip_along_ray=2,
+            centered=True, nyquist_vel=None, rays_wrap_around=False,
+            keep_original=False, vel_field=VDOP_FIELD, corr_vel_field=None)
 
     else:
         raise ValueError('Unsupported velocity correction routine')
 
     radar.add_field(CORR_VDOP_FIELD, vdop_corr, replace_existing=True)
 
-    # TODO: reflectivity correction
+    # TODO
+    # Step 3: Reflectivity correction
 
     # Parse metadata
     radar.metadata = _create_metadata(radar, filename)
@@ -164,7 +166,16 @@ if __name__ == '__main__':
     parser.add_argument('outdir', type=str, help=None)
     parser.add_argument('-v', '--verbose', nargs='?', type=bool, default=False,
                         const=True, help=None)
+    parser.add_argument('-db', '--debug', nargs='?', type=bool, default=False,
+                        const=True, help=None)
     args = parser.parse_args()
+
+    if args.debug:
+        print 'MIN_NCP -> {}'.format(MIN_NCP)
+        print 'DEALIAS -> {}'.format(DEALIAS)
+        print 'INTERVAL_SPLITS -> {}'.format(INTERVAL_SPLITS)
+        print 'TEXTURE_SAMPLE -> {}'.format(TEXTURE_SAMPLE)
+        print 'TEXTURE_WINDOW -> {}'.format(TEXTURE_WINDOW)
 
     # Parse all radar files to process
     files = [os.path.join(args.inpdir, f) for f in

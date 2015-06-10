@@ -25,6 +25,7 @@ FACILITY = 'I4: Billings, Oklahoma'
 
 # Basic radar thresholds
 MIN_NCP = 0.3
+DILATE = True
 
 # Echo classification parameters
 ZERO = 1.0e-5
@@ -40,10 +41,11 @@ TEXTURES =
 HEIGHTS = None
 
 # Coherency and texture parameters
-TEXTURE_WINDOW, TEXTURE_SAMPLE = (3, 3), 5
-SALT_WINDOW, SALT_SAMPLE = (5, 5), 10
-VDOP_COHER_LIMITS, VDOP_COHER_BINS = (0, 20), 100
-SW_COHER_LIMITS, SW_COHER_BINS = (0, 5), 50
+TEXTURE_SAMPLE, TEXTURE_WINDOW= 5, (3, 3)
+SALT_SAMPLE, SALT_WINDOW = 10, (5, 5)
+VDOP_COHER_BINS, VDOP_COHER_LIMITS = 100, (0, 20)
+PHASE_COHER_BINS, PHASE_COHER_LIMITS = 100, (0, 0.03)
+SW_COHER_BINS, SW_COHER_LIMITS = 50, (0, 5)
 
 # Define output NetCDF format
 FORMAT = 'NETCDF4'
@@ -67,12 +69,13 @@ TEXTURE_FIELDS = [
     NCP_FIELD,
     ]
 
-# Define fields to exclude from radar object
+# Define fields to exclude when reading  radar file
 EXLUDE_FIELDS = [
     'radar_echo_classification',
     'corrected_reflectivity',
     'total_power',
     'corrected_differential_reflectivity',
+    'unfolded_differential_phase',
     ]
 
 
@@ -96,6 +99,13 @@ def process_file(filename, outdir, verbose=False):
         rays_wrap_around=False, remove_salt=False, fill_value=None,
         vdop_field=VDOP_FIELD, vdop_text_field=None, cohere_field=None,
         verbose=verbose)
+    gf = noise.velocity_phasor_coherency(
+        radar, gatefilter=gf, num_bins=PHASE_COHER_BINS,
+        limits=PHASE_COHER_LIMITS, texture_window=TEXTURE_WINDOW,
+        texture_sample=TEXTURE_SAMPLE, min_sigma=None, max_sigma=None,
+        rays_wrap_around=False, remove_salt=False, fill_value=None,
+        vdop_field=VDOP_FIELD, vdop_phase_field=None, phase_text_field=None,
+        cohere_field=None, verbose=verbose)
     gf = noise.spectrum_width_coherency(
         radar, gatefilter=gf, num_bins=SW_COHER_BINS,
         limits=SW_COHER_LIMITS, texture_window=TEXTURE_WINDOW,
@@ -105,7 +115,7 @@ def process_file(filename, outdir, verbose=False):
         verbose=verbose)
     gf = noise.significant_detection(
         radar, gatefilter=gf, remove_salt=True, salt_window=SALT_WINDOW,
-        salt_sample=SALT_SAMPLE, fill_holes=False, dilate=False,
+        salt_sample=SALT_SAMPLE, fill_holes=False, dilate=DILATE,
         structure=None, min_ncp=MIN_NCP, ncp_field=NCP_FIELD,
         detect_field=None, verbose=verbose)
 
