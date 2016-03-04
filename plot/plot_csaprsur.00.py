@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
 import os
+import time
+import tarfile
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,8 +14,9 @@ from matplotlib.colorbar import make_axes
 from matplotlib.ticker import MultipleLocator
 
 from pyart.graph import cm
-from pyart.io import read_mdv
+from pyart.io import read
 from pyart.config import get_field_name
+from pyart.util.datetime_utils import datetimes_from_radar
 
 # Define sweeps to be plotted
 SWEEPS = [0, 1, 2]
@@ -21,7 +24,7 @@ SWEEPS = [0, 1, 2]
 # Define field names
 REFL_FIELD = get_field_name('reflectivity')
 VDOP_FIELD = get_field_name('velocity')
-WIDTH_FIELD = get_field_name('spectrum_width')
+SPW_FIELD = get_field_name('spectrum_width')
 RHOHV_FIELD = get_field_name('cross_correlation_ratio')
 ZDR_FIELD = get_field_name('differential_reflectivity')
 PHIDP_FIELD = get_field_name('differential_phase')
@@ -36,135 +39,135 @@ EXCLUDE_FIELDS = [
 
 # Define colour maps
 CMAP_REFL = cm.NWSRef
-CMAP_VDOP = plt.get_cmap('jet')
-CMAP_WIDTH = plt.get_cmap('jet')
-CMAP_RHOHV = plt.get_cmap('jet')
-CMAP_ZDR = plt.get_cmap('jet')
-CMAP_PHIDP = plt.get_cmap('jet')
-CMAP_NCP = plt.get_cmap('jet')
+CMAP_VDOP = cm.NWSVel
+CMAP_SPW = cm.NWS_SPW
+CMAP_RHOHV = cm.Carbone17
+CMAP_ZDR = cm.RefDiff
+CMAP_PHIDP = cm.Wild25
+CMAP_NCP = cm.Carbone17
 
 # Normalize colour maps
-NORM_REFL = BoundaryNorm(np.arange(-10, 51, 1), CMAP_REFL.N)
-NORM_VDOP = BoundaryNorm(np.arange(-16, 17, 1), CMAP_VDOP.N)
-NORM_WIDTH = BoundaryNorm(np.arange(0, 8.5, 0.5), CMAP_WIDTH.N)
-NORM_RHOHV = BoundaryNorm(np.arange(0, 1.1, 0.1), CMAP_RHOHV.N)
-NORM_ZDR = BoundaryNorm(np.arange(-5, 5.1, 0.1), CMAP_ZDR.N)
-NORM_PHIDP = BoundaryNorm(np.arange(-180, 1, 1), CMAP_PHIDP.N)
+NORM_REFL = BoundaryNorm(np.arange(-20, 65, 5), CMAP_REFL.N)
+NORM_VDOP = BoundaryNorm(np.arange(-16, 18, 2), CMAP_VDOP.N)
+NORM_SPW = BoundaryNorm(np.arange(0, 8.5, 0.5), CMAP_SPW.N)
+NORM_RHOHV = BoundaryNorm(np.arange(0, 1.05, 0.05), CMAP_RHOHV.N)
+NORM_ZDR = BoundaryNorm(np.arange(-6, 6.5, 0.5), CMAP_ZDR.N)
+NORM_PHIDP = BoundaryNorm(np.arange(-180, 185, 5), CMAP_PHIDP.N)
 NORM_NCP = BoundaryNorm(np.arange(0, 1.05, 0.05), CMAP_NCP.N)
 
 # Define colour bar ticks
-TICKS_REFL = np.arange(-10, 60, 10)
-TICKS_VDOP = np.arange(-16, 20, 4)
-TICKS_WIDTH = np.arange(0, 9, 1)
-TICKS_RHOHV = np.arange(0, 1.1, 0.1)
-TICKS_ZDR = np.arange(-5, 6, 1)
-TICKS_PHIDP = np.arange(-180, 20, 20)
-TICKS_NCP = np.arange(0, 1.1, 0.1)
+TICKS_REFL = np.arange(-20, 80, 20)
+TICKS_VDOP = np.arange(-16, 22, 8)
+TICKS_SPW = np.arange(0, 10, 2)
+TICKS_RHOHV = np.arange(0, 1.2, 0.2)
+TICKS_ZDR = np.arange(-6, 8, 2)
+TICKS_PHIDP = np.arange(-180, 270, 90)
+TICKS_NCP = np.arange(0, 1.2, 0.2)
+TICKS = [
+    TICKS_REFL,
+    TICKS_VDOP,
+    TICKS_SPW,
+    TICKS_RHOHV,
+    TICKS_ZDR,
+    TICKS_PHIDP,
+    TICKS_NCP,
+    ]
+
+# Define figure parameters
+rcParams['font.family'] = 'sans-serif'
+rcParams['font.sans-serif'] = 'Bitstream Vera Sans'
+rcParams['mathtext.default'] = 'regular'
+rcParams['text.usetex'] = False
+rcParams['font.size'] = 12
+rcParams['axes.titlesize'] = 12
+rcParams['axes.labelsize'] = 12
+rcParams['xtick.labelsize'] = 12
+rcParams['ytick.labelsize'] = 12
+rcParams['legend.fontsize'] = 12
+rcParams['font.weight'] = 'bold'
+rcParams['axes.titleweight'] = 'bold'
+rcParams['axes.labelweight'] = 'bold'
+rcParams['axes.linewidth'] = 1.5
+rcParams['xtick.major.size'] = 6
+rcParams['xtick.major.width'] = 1
+rcParams['xtick.minor.size'] = 3
+rcParams['xtick.minor.width'] = 1
+rcParams['ytick.major.size'] = 6
+rcParams['ytick.major.width'] = 1
+rcParams['ytick.minor.size'] = 3
+rcParams['ytick.minor.width'] = 1
+rcParams['figure.figsize'] = (28, 12)
 
 
-def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
+def multipanel(radar, outdir, dpi=90, debug=False, verbose=False):
     """
     """
-
-    # Set figure parameters
-    rcParams['font.size'] = 14
-    rcParams['font.weight'] = 'bold'
-    rcParams['axes.titlesize'] = 14
-    rcParams['axes.titleweight'] = 'bold'
-    rcParams['axes.labelsize'] = 14
-    rcParams['axes.labelweight'] = 'bold'
-    rcParams['axes.linewidth'] = 1.5
-    rcParams['xtick.major.size'] = 4
-    rcParams['xtick.major.width'] = 1
-    rcParams['xtick.minor.size'] = 2
-    rcParams['xtick.minor.width'] = 1
-    rcParams['ytick.major.size'] = 4
-    rcParams['ytick.major.width'] = 1
-    rcParams['ytick.minor.size'] = 2
-    rcParams['ytick.minor.width'] = 1
 
     # Create figure instance
     subs = {'xlim': (-117, 117), 'ylim': (-117, 117)}
-    figs = {'figsize': (55, 25)}
-    fig, ax = plt.subplots(nrows=len(SWEEPS), ncols=7, subplot_kw=subs, **figs)
+    fig, axes = plt.subplots(nrows=len(SWEEPS), ncols=7, subplot_kw=subs)
+    fig.subplots_adjust(wspace=0.5, hspace=0.6)
 
     if debug:
-        print 'Number of sweeps: {}'.format(radar.nsweeps)
+        print('Number of sweeps: {}'.format(radar.nsweeps))
 
     # Loop over specified sweeps
     for i, sweep in enumerate(SWEEPS):
 
         if verbose:
-            print 'Plotting sweep index: {}'.format(sweep)
+            print('Plotting sweep index: {}'.format(sweep))
 
         # (a) Reflectivity
         qma = _pcolormesh(
             radar, REFL_FIELD, sweep=sweep, cmap=CMAP_REFL, norm=NORM_REFL,
-            fig=fig, ax=ax[i,0])
+            fig=fig, ax=axes[i,0])
 
         # (b) Doppler velocity
         qmb = _pcolormesh(
             radar, VDOP_FIELD, sweep=sweep, cmap=CMAP_VDOP, norm=NORM_VDOP,
-            fig=fig, ax=ax[i,1])
+            fig=fig, ax=axes[i,1])
 
         # (c) Spectrum width
         qmc = _pcolormesh(
-            radar, WIDTH_FIELD, sweep=sweep, cmap=CMAP_WIDTH, norm=NORM_WIDTH,
-            fig=fig, ax=ax[i,2])
+            radar, SPW_FIELD, sweep=sweep, cmap=CMAP_SPW, norm=NORM_SPW,
+            fig=fig, ax=axes[i,2])
 
         # (d) Copolar correlation coefficient
         qmd = _pcolormesh(
             radar, RHOHV_FIELD, sweep=sweep, cmap=CMAP_RHOHV, norm=NORM_RHOHV,
-            fig=fig, ax=ax[i,3])
+            fig=fig, ax=axes[i,3])
 
         # (e) Differential reflectivity
         qme = _pcolormesh(
             radar, ZDR_FIELD, sweep=sweep, cmap=CMAP_ZDR, norm=NORM_ZDR,
-            fig=fig, ax=ax[i,4])
+            fig=fig, ax=axes[i,4])
 
         # (f) Differential phase
         qmf = _pcolormesh(
             radar, PHIDP_FIELD, sweep=sweep, cmap=CMAP_PHIDP, norm=NORM_PHIDP,
-            fig=fig, ax=ax[i,5])
+            fig=fig, ax=axes[i,5])
 
         # (g) Normalized coherent power
         qmg = _pcolormesh(
             radar, NCP_FIELD, sweep=sweep, cmap=CMAP_NCP, norm=NORM_NCP,
-            fig=fig, ax=ax[i,6])
-
-    # Format plot axes
-    for i, j in np.ndindex(ax.shape):
-        ax[i,j].xaxis.set_major_locator(MultipleLocator(20))
-        ax[i,j].xaxis.set_minor_locator(MultipleLocator(5))
-        ax[i,j].yaxis.set_major_locator(MultipleLocator(20))
-        ax[i,j].yaxis.set_minor_locator(MultipleLocator(5))
-        ax[i,j].set_xlabel('Eastward Range from Radar (km)')
-        ax[i,j].set_ylabel('Northward Range from Radar (km)')
-        ax[i,j].grid(which='major')
+            fig=fig, ax=axes[i,6])
 
     # Create color bars
-    cax = []
-    for i in range(ax.shape[1]):
-        cax.append(
-            make_axes([axis for axis in ax[:,i].flat], location='bottom',
-                      pad=0.04, fraction=0.01, shrink=1.0, aspect=20))
-    fig.colorbar(mappable=qma, cax=cax[0][0], orientation='horizontal',
-                 ticks=TICKS_REFL)
-    fig.colorbar(mappable=qmb, cax=cax[1][0], orientation='horizontal',
-                 ticks=TICKS_VDOP)
-    fig.colorbar(mappable=qmc, cax=cax[2][0], orientation='horizontal',
-                 ticks=TICKS_WIDTH)
-    fig.colorbar(mappable=qmd, cax=cax[3][0], orientation='horizontal',
-                 ticks=TICKS_RHOHV)
-    fig.colorbar(mappable=qme, cax=cax[4][0], orientation='horizontal',
-                 ticks=TICKS_ZDR)
-    fig.colorbar(mappable=qmf, cax=cax[5][0], orientation='horizontal',
-                 ticks=TICKS_PHIDP)
-    fig.colorbar(mappable=qmg, cax=cax[6][0], orientation='horizontal',
-                 ticks=TICKS_NCP)
+    qm = [qma, qmb, qmc, qmd, qme, qmf, qmg]
+    _create_colorbars(fig, axes, qm, TICKS)
+
+    # Format plot axes
+    for ax in axes.flat:
+        ax.xaxis.set_major_locator(MultipleLocator(50))
+        ax.xaxis.set_minor_locator(MultipleLocator(10))
+        ax.yaxis.set_major_locator(MultipleLocator(50))
+        ax.yaxis.set_minor_locator(MultipleLocator(10))
+        ax.set_xlabel('Eastward Range (km)')
+        ax.set_ylabel('Northward Range (km)')
+        ax.grid(which='major')
 
     # Define image file name
-    date_stamp = _datetimes(radar).min().strftime('%Y%m%d.%H%M%S')
+    date_stamp = datetimes_from_radar(radar).min().strftime('%Y%m%d.%H%M%S')
     fname = '{}.png'.format(date_stamp)
 
     # Save figure
@@ -172,6 +175,8 @@ def multipanel(radar, outdir, dpi=50, debug=False, verbose=False):
                 bbox_inches='tight')
 
     # Close figure to free memory
+    plt.cla()
+    plt.clf()
     plt.close(fig)
 
     return
@@ -188,10 +193,6 @@ def _pcolormesh(
     if ax is None:
         ax = plt.gca()
 
-    # Parse colour map
-    if cmap is None:
-        cmap = plt.get_cmap('jet')
-
     # Parse radar coordinates
     # Convert angles to radians and range to kilometers
     rng = radar.range['data'] / 1000.0
@@ -207,12 +208,13 @@ def _pcolormesh(
 
     # Create quadmesh
     qm = ax.pcolormesh(
-        X, Y, data, cmap=cmap, norm=norm, shading='flat', alpha=None)
+        X, Y, data, cmap=cmap, norm=norm, shading='flat', alpha=None,
+        rasterized=True)
 
     # Create title
-    s0, sn = radar.get_start_end(sweep)
-    sweep_time = _datetimes(radar)[(s0 + sn) / 2]
-    title = '{} {:.1f} deg {}Z\n{}'.format(
+    s0, sf = radar.get_start_end(sweep)
+    sweep_time = datetimes_from_radar(radar)[(s0 + sf) / 2]
+    title = '{} {:.1f} deg\n{}Z\n{}'.format(
             radar.metadata['instrument_name'],
             radar.fixed_angle['data'][sweep],
             sweep_time.isoformat(), field)
@@ -221,11 +223,18 @@ def _pcolormesh(
     return qm
 
 
-def _datetimes(radar):
+def _create_colorbars(fig, axes, qm, ticks):
     """
     """
 
-    return num2date(radar.time['data'], radar.time['units'])
+    for i in range(axes.shape[1]):
+        parents = [ax for ax in axes[:,i].flat]
+        cax, kw = make_axes(parents, location='bottom', pad=0.06, shrink=1.0,
+                            fraction=0.01, aspect=20)
+        fig.colorbar(mappable=qm[i], cax=cax, orientation='horizontal',
+                     ticks=ticks[i], spacing='uniform', drawedges=False)
+
+    return
 
 
 if __name__ == '__main__':
@@ -246,17 +255,31 @@ if __name__ == '__main__':
     # Parse files to plot
     files = [os.path.join(args.inpdir, f) for f in
              sorted(os.listdir(args.inpdir)) if args.stamp in f]
-    if args.verbose:
-        print 'Number of files to plot: {}'.format(len(files))
 
-    # Loop over all files
+    if args.verbose:
+        print('Number of files to plot: {}'.format(len(files)))
+
     for filename in files:
+
         if args.verbose:
-            print 'Plotting file: {}'.format(os.path.basename(filename))
+            print('Plotting file: {}'.format(os.path.basename(filename)))
+
+        # Create file object from tar file
+        tf = tarfile.TarFile(name=filename, mode='r', format=None)
+        fobj = tf.extractfile(tf.getmembers()[0])
 
         # Read radar data
-        radar = read_mdv(filename, exclude_fields=EXCLUDE_FIELDS)
+        radar = read(fobj, exclude_fields=EXCLUDE_FIELDS)
+
+        # Record starting time
+        start = time.time()
 
         # Call desired plotting function
         multipanel(radar, args.outdir, dpi=args.dpi, debug=args.debug,
                    verbose=args.verbose)
+
+        # Record elapsed time
+        elapsed = time.time() - start
+
+        if args.verbose:
+            print('Elapsed time to save plot: {:.0f} sec'.format(elapsed))
