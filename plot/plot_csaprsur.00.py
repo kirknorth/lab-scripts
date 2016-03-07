@@ -195,11 +195,11 @@ def _pcolormesh(
 
     # Parse radar coordinates
     # Convert angles to radians and range to kilometers
-    rng = radar.range['data'] / 1000.0
-    azi = np.radians(radar.get_azimuth(sweep))
+    _range = radar.range['data'] / 1000.0
+    azimuth = np.radians(radar.get_azimuth(sweep))
 
     # Compute radar sweep coordinates
-    AZI, RNG = np.meshgrid(azi, rng, indexing='ij')
+    AZI, RNG = np.meshgrid(azimuth, _range, indexing='ij')
     X = RNG * np.sin(AZI)
     Y = RNG * np.cos(AZI)
 
