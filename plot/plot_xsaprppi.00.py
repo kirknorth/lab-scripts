@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 import os
-import time
 import tarfile
+import time
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,6 +19,9 @@ from pyart.util.datetime_utils import datetimes_from_radar
 
 # Define sweeps to be plotted
 SWEEPS = [0, 1, 2]
+
+# Define maximum range to plot in kilometers
+MAX_RANGE = 40.0
 
 # Define field names
 REFL_FIELD = get_field_name('reflectivity')
@@ -46,21 +49,21 @@ CMAP_PHIDP = cm.Wild25
 CMAP_NCP = cm.Carbone17
 
 # Normalize colour maps
-NORM_REFL = BoundaryNorm(np.arange(-20, 65, 5), CMAP_REFL.N)
+NORM_REFL = BoundaryNorm(np.arange(-30, 55, 5), CMAP_REFL.N)
 NORM_VDOP = BoundaryNorm(np.arange(-16, 18, 2), CMAP_VDOP.N)
-NORM_SPW = BoundaryNorm(np.arange(0, 8.5, 0.5), CMAP_SPW.N)
+NORM_SPW = BoundaryNorm(np.arange(0, 4.1, 0.1), CMAP_SPW.N)
 NORM_RHOHV = BoundaryNorm(np.arange(0, 1.05, 0.05), CMAP_RHOHV.N)
 NORM_ZDR = BoundaryNorm(np.arange(-6, 6.5, 0.5), CMAP_ZDR.N)
-NORM_PHIDP = BoundaryNorm(np.arange(-180, 185, 5), CMAP_PHIDP.N)
+NORM_PHIDP = BoundaryNorm(np.arange(0, 365, 5), CMAP_PHIDP.N)
 NORM_NCP = BoundaryNorm(np.arange(0, 1.05, 0.05), CMAP_NCP.N)
 
 # Define colour bar ticks
-TICKS_REFL = np.arange(-20, 80, 20)
+TICKS_REFL = np.arange(-30, 70, 20)
 TICKS_VDOP = np.arange(-16, 22, 8)
-TICKS_SPW = np.arange(0, 10, 2)
+TICKS_SPW = np.arange(0, 5, 1)
 TICKS_RHOHV = np.arange(0, 1.2, 0.2)
 TICKS_ZDR = np.arange(-6, 8, 2)
-TICKS_PHIDP = np.arange(-180, 270, 90)
+TICKS_PHIDP = np.arange(0, 450, 90)
 TICKS_NCP = np.arange(0, 1.2, 0.2)
 TICKS = [
     TICKS_REFL,
@@ -72,7 +75,7 @@ TICKS = [
     TICKS_NCP,
     ]
 
-# Define figure parameters
+# Define figure paramters
 rcParams['font.family'] = 'sans-serif'
 rcParams['font.sans-serif'] = 'Bitstream Vera Sans'
 rcParams['mathtext.default'] = 'regular'
@@ -103,9 +106,9 @@ def multipanel(radar, outdir, dpi=90, debug=False, verbose=False):
     """
 
     # Create figure instance
-    subs = {'xlim': (-117, 117), 'ylim': (-117, 117)}
+    subs = {'xlim': (-40, 40), 'ylim': (-40, 40)}
     fig, axes = plt.subplots(nrows=len(SWEEPS), ncols=7, subplot_kw=subs)
-    fig.subplots_adjust(wspace=0.5, hspace=0.6)
+    fig.subplots_adjust(wspace=0.5, hspace=0.7)
 
     if debug:
         print('Number of sweeps: {}'.format(radar.nsweeps))
@@ -151,19 +154,20 @@ def multipanel(radar, outdir, dpi=90, debug=False, verbose=False):
             radar, NCP_FIELD, sweep=sweep, cmap=CMAP_NCP, norm=NORM_NCP,
             fig=fig, ax=axes[i,6])
 
+    # Format plot axes
+    for ax in axes.flat:
+        ax.xaxis.set_major_locator(MultipleLocator(20))
+        ax.xaxis.set_minor_locator(MultipleLocator(5))
+        ax.yaxis.set_major_locator(MultipleLocator(20))
+        ax.yaxis.set_minor_locator(MultipleLocator(5))
+        ax.set_xlabel('Eastward Range (km)')
+        ax.set_ylabel('Northward Range (km)')
+        ax.grid(which='major')
+
     # Create color bars
     qm = [qma, qmb, qmc, qmd, qme, qmf, qmg]
     _create_colorbars(fig, axes, qm, TICKS)
 
-    # Format plot axes
-    for ax in axes.flat:
-        ax.xaxis.set_major_locator(MultipleLocator(50))
-        ax.xaxis.set_minor_locator(MultipleLocator(10))
-        ax.yaxis.set_major_locator(MultipleLocator(50))
-        ax.yaxis.set_minor_locator(MultipleLocator(10))
-        ax.set_xlabel('Eastward Range (km)')
-        ax.set_ylabel('Northward Range (km)')
-        ax.grid(which='major')
 
     # Define image file name
     date_stamp = datetimes_from_radar(radar).min().strftime('%Y%m%d.%H%M%S')
@@ -181,8 +185,8 @@ def multipanel(radar, outdir, dpi=90, debug=False, verbose=False):
     return
 
 
-def _pcolormesh(
-        radar, field, sweep=0, cmap=None, norm=None, fig=None, ax=None):
+def _pcolormesh(radar, field, sweep=0, cmap=None, norm=None, fig=None,
+                ax=None):
     """
     """
 
@@ -196,14 +200,15 @@ def _pcolormesh(
     # Convert angles to radians and range to kilometers
     _range = radar.range['data'] / 1000.0
     azimuth = np.radians(radar.get_azimuth(sweep))
+    rf = np.abs(_range - MAX_RANGE).argmin()
 
     # Compute radar sweep coordinates
-    AZI, RNG = np.meshgrid(azimuth, _range, indexing='ij')
+    AZI, RNG = np.meshgrid(azimuth, _range[:rf+1], indexing='ij')
     X = RNG * np.sin(AZI)
     Y = RNG * np.cos(AZI)
 
     # Parse radar data
-    data = radar.get_field(sweep, field)
+    data = radar.get_field(sweep, field)[:,:rf+1]
 
     # Create quadmesh
     qm = ax.pcolormesh(
@@ -243,13 +248,16 @@ if __name__ == '__main__':
     parser.add_argument('inpdir', type=str, help=None)
     parser.add_argument('stamp', type=str, help=None)
     parser.add_argument('outdir', type=str, help=None)
-    parser.add_argument('--dpi', nargs='?', type=int, const=50, default=50,
+    parser.add_argument('--dpi', nargs='?', type=int, const=90, default=90,
                         help=None)
     parser.add_argument('-v', '--verbose', nargs='?', type=bool, const=True,
                         default=False, help=None)
     parser.add_argument('-db', '--debug', nargs='?', type=bool, const=True,
                         default=False, help=None)
     args = parser.parse_args()
+
+    if args.verbose:
+        print('MAX_RANGE -> {} km'.format(MAX_RANGE))
 
     # Parse files to plot
     files = [os.path.join(args.inpdir, f) for f in
