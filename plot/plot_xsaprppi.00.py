@@ -35,7 +35,6 @@ NCP_FIELD = get_field_name('normalized_coherent_power')
 # Define fields to exclude from radar object
 EXCLUDE_FIELDS = [
     'corrected_reflectivity',
-    'radar_echo_classification',
     'corrected_differential_reflectivity'
     ]
 
@@ -293,3 +292,6 @@ if __name__ == '__main__':
             elapsed = time.time() - start
             if args.verbose:
                 print('Elapsed time to save plot: {:.0f} sec'.format(elapsed))
+
+        # Close tar file
+        tf.close()
