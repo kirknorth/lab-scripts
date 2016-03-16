@@ -17,13 +17,10 @@ from grid.core import Weight, Domain
 
 
 # Radar descriptors
-RADAR = 'KVNX'
-RADARS = {
-    'KVNX': ['V06innerC1mmcg', 'KVNX', 'b1', 'KVNX: Vance AFB, Oklahoma'],
-    'KICT': ['V03pblC1mmcg', 'KICT', 'b1', 'KICT: Wichita, Kansas'],
-    'KINX': ['V03crmC1mmcg', 'KINX', 'b1', 'KINX: Tulsa, Oklahoma'],
-    }
-QF, FN, DL, FACILITY = RADARS[RADAR]
+QF = 'innerC1mmcg'
+FN = 'I7'
+DL = 'b1'
+FACILITY = 'I7: Nardin, Oklahoma'
 
 # Define k-d tree parameters
 NUM_NEIGHBORS = 200
@@ -63,6 +60,8 @@ INNER_DOMAIN = [
     np.arange(-25000.0, 100500.0, 500.0),
     np.arange(-50000.0, 50500.0, 500.0)
     ]
+
+# Analysis domain dictionary
 COORDS = {
     'PBL': PBL_DOMAIN,
     'CRM': CRM_DOMAIN,
@@ -78,18 +77,20 @@ SPW_FIELD = get_field_name('spectrum_width')
 RHOHV_FIELD = get_field_name('cross_correlation_ratio')
 ZDR_FIELD = get_field_name('differential_reflectivity')
 PHIDP_FIELD = get_field_name('differential_phase')
+NCP_FIELD = get_field_name('normalized_coherent_power')
 SD_FIELD = get_field_name('radar_significant_detection')
 
 # Fields to grid
 FIELDS = [
     REFL_FIELD,
+    REFL_CORR_FIELD,
     VDOP_FIELD,
+    VDOP_CORR_FIELD,
     SPW_FIELD,
     RHOHV_FIELD,
     ZDR_FIELD,
     PHIDP_FIELD,
-    REFL_CORR_FIELD,
-    VDOP_CORR_FIELD,
+    NCP_FIELD,
     ]
 
 # Fields to exclude from radar object
@@ -99,8 +100,7 @@ EXCLUDE_FIELDS = None
 FORMAT = 'NETCDF3_CLASSIC'
 
 
-def process_radar(radar, domain, weight, outdir, gatefilter=None, debug=False,
-                  verbose=False):
+def process_file(filename, domain, weight, outdir, debug=False, verbose=False):
     """
     """
 
@@ -123,12 +123,12 @@ def process_radar(radar, domain, weight, outdir, gatefilter=None, debug=False,
         max_range=MAX_RANGE, gqi_field=None, legacy=True, debug=debug,
         verbose=verbose)
 
-    # Add new metadata
+    # Add additional metadata
     _add_metadata(grid, filename)
 
     # ARM file name protocols
     date_stamp = datetimes_from_radar(radar).min().strftime('%Y%m%d.%H%M%S')
-    fname = 'nexradwsr88d{}{}.{}.{}.cdf'.format(QF, FN, DL, date_stamp)
+    fname = 'sgpcsapr{}{}.{}.{}.cdf'.format(QF, FN, DL, date_stamp)
 
     # Write MMCG NetCDF file
     grid_io.write_grid(
@@ -193,29 +193,29 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.verbose:
-        print 'QF -> {}'.format(QF)
-        print 'FN -> {}'.format(FN)
-        print 'DL -> {}'.format(DL)
-        print 'FACILITY -> {}'.format(FACILITY)
-        print 'DOMAIN -> {}'.format(DOMAIN)
-        print 'SITE_ID -> {}'.format(SITE_ID)
+        print('QF -> {}'.format(QF))
+        print('FN -> {}'.format(FN))
+        print('DL -> {}'.format(DL))
+        print('FACILITY -> {}'.format(FACILITY))
+        print('DOMAIN -> {}'.format(DOMAIN))
+        print('SITE_ID -> {}'.format(SITE_ID))
         print('LAT_0 -> {}'.format(ORIGIN[0]))
         print('LON_0 -> {}'.format(ORIGIN[1]))
         print('ALT_0 -> {}'.format(ORIGIN[2]))
-        print 'TOA -> {} m'.format(TOA)
-        print 'NUM_NEIGHBORS -> {}'.format(NUM_NEIGHBORS)
-        print 'LEAFSIZE -> {}'.format(LEAFSIZE)
-        print 'CUTOFF_RADIUS -> {} m'.format(CUTOFF_RADIUS)
-        print 'KAPPA_STAR -> {}'.format(KAPPA_STAR)
-        print 'DATA_SPACING -> {} m'.format(DATA_SPACING)
-        print 'MAX_RANGE -> {} m'.format(MAX_RANGE)
+        print('TOA -> {} m'.format(TOA))
+        print('NUM_NEIGHBORS -> {}'.format(NUM_NEIGHBORS))
+        print('LEAFSIZE -> {}'.format(LEAFSIZE))
+        print('CUTOFF_RADIUS -> {} m'.format(CUTOFF_RADIUS))
+        print('KAPPA_STAR -> {}'.format(KAPPA_STAR))
+        print('DATA_SPACING -> {} m'.format(DATA_SPACING))
+        print('MAX_RANGE -> {} m'.format(MAX_RANGE))
 
     # Parse all radar files to process
     files = [os.path.join(args.inpdir, f) for f in
              sorted(os.listdir(args.inpdir)) if args.stamp in f]
 
     if args.verbose:
-        print 'Number of files to process = {}'.format(len(files))
+        print('Number of files to process = {}'.format(len(files)))
 
     # Define grid domain
     domain = Domain(COORDS[DOMAIN], ORIGIN, proj='lcca', ellps='WGS84',
