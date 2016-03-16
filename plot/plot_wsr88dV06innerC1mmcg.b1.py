@@ -26,7 +26,6 @@ SPW_FIELD = get_field_name('spectrum_width')
 RHOHV_FIELD = get_field_name('cross_correlation_ratio')
 ZDR_FIELD = get_field_name('differential_reflectivity')
 PHIDP_FIELD = get_field_name('differential_phase')
-NCP_FIELD = get_field_name('normalized_coherent_power')
 DIST_FIELD = get_field_name('nearest_neighbor_distance')
 TIME_FIELD = get_field_name('nearest_neighbor_time')
 GQI_FIELD = get_field_name('grid_quality_index')
@@ -38,29 +37,26 @@ CMAP_SPW = cm.NWS_SPW
 CMAP_RHOHV = cm.Carbone17
 CMAP_ZDR = cm.RefDiff
 CMAP_PHIDP = cm.Wild25
-CMAP_NCP = cm.Carbone17
 CMAP_GQI = cm.Carbone17
 CMAP_DIST = cm.BlueBrown10
 
 # Normalize colour maps
-NORM_REFL = BoundaryNorm(np.arange(-20, 65, 5), CMAP_REFL.N)
+NORM_REFL = BoundaryNorm(np.arange(-10, 65, 5), CMAP_REFL.N)
 NORM_VDOP = BoundaryNorm(np.arange(-30, 32, 2), CMAP_VDOP.N)
 NORM_SPW = BoundaryNorm(np.arange(0, 8.5, 0.5), CMAP_SPW.N)
 NORM_RHOHV = BoundaryNorm(np.arange(0, 1.05, 0.05), CMAP_RHOHV.N)
 NORM_ZDR = BoundaryNorm(np.arange(-6, 6.5, 0.5), CMAP_ZDR.N)
-NORM_PHIDP = BoundaryNorm(np.arange(-180, 185, 5), CMAP_PHIDP.N)
-NORM_NCP = BoundaryNorm(np.arange(0, 1.05, 0.05), CMAP_NCP.N)
+NORM_PHIDP = BoundaryNorm(np.arange(0, 365, 5), CMAP_PHIDP.N)
 NORM_GQI = BoundaryNorm(np.arange(0, 1.05, 0.05), CMAP_GQI.N)
 NORM_DIST = BoundaryNorm(np.arange(0, 2.1, 0.1), CMAP_DIST.N)
 
 # Define colour bar ticks
-TICKS_REFL = np.arange(-20, 80, 20)
+TICKS_REFL = np.arange(-10, 70, 10)
 TICKS_VDOP = np.arange(-30, 40, 10)
 TICKS_SPW = np.arange(0, 9, 1)
 TICKS_RHOHV = np.arange(0, 1.2, 0.2)
 TICKS_ZDR = np.arange(-6, 8, 2)
-TICKS_PHIDP = np.arange(-180, 270, 90)
-TICKS_NCP = np.arange(0, 1.2, 0.2)
+TICKS_PHIDP = np.arange(0, 450, 90)
 TICKS_GQI = np.arange(0, 1.2, 0.2)
 TICKS_DIST = np.arange(0, 2.4, 0.4)
 TICKS = [
@@ -71,7 +67,6 @@ TICKS = [
     TICKS_RHOHV,
     TICKS_ZDR,
     TICKS_PHIDP,
-    TICKS_NCP,
     TICKS_GQI,
     TICKS_DIST,
     ]
@@ -99,7 +94,7 @@ rcParams['ytick.major.size'] = 6
 rcParams['ytick.major.width'] = 1
 rcParams['ytick.minor.size'] = 3
 rcParams['ytick.minor.width'] = 1
-rcParams['figure.figsize'] = (38, 24)
+rcParams['figure.figsize'] = (36, 24)
 
 
 def plot_file(filename, outdir, dpi=90, debug=False, verbose=False):
@@ -107,21 +102,21 @@ def plot_file(filename, outdir, dpi=90, debug=False, verbose=False):
     """
 
     if verbose:
-        print('Plotting file: {}'.format(os.path.basename(filename)))
+        print 'Plotting file: {}'.format(os.path.basename(filename))
 
     # Read gridded data
     grid = Dataset(filename, mode='r')
 
     # Initialize figure and axes
     subs = {'xlim': (-50, 50), 'ylim': (-25, 100)}
-    fig, axes = plt.subplots(nrows=len(HEIGHTS), ncols=10, subplot_kw=subs)
+    fig, axes = plt.subplots(nrows=len(HEIGHTS), ncols=9, subplot_kw=subs)
     fig.subplots_adjust(wspace=0.4, hspace=0.6)
 
     # Loop over all heights
     for k, height in enumerate(HEIGHTS):
 
         if verbose:
-            print('Plotting height index: {}'.format(height))
+            print 'Plotting height index: {}'.format(height)
 
         # (a) Reflectivity
         qma = _plot_cappi(
@@ -158,23 +153,18 @@ def plot_file(filename, outdir, dpi=90, debug=False, verbose=False):
             grid, PHIDP_FIELD, height=height, cmap=CMAP_PHIDP, norm=NORM_PHIDP,
             fig=fig, ax=axes[k,6])
 
-        # (h) Normalized coherent power
+        # (h) Grid quality index
         qmh = _plot_cappi(
-            grid, NCP_FIELD, height=height, cmap=CMAP_NCP, norm=NORM_NCP,
+            grid, GQI_FIELD, height=height, cmap=CMAP_GQI, norm=NORM_GQI,
             fig=fig, ax=axes[k,7])
 
-        # (i) Grid quality index
+        # (i) Nearest neighbour distance
         qmi = _plot_cappi(
-            grid, GQI_FIELD, height=height, cmap=CMAP_GQI, norm=NORM_GQI,
-            fig=fig, ax=axes[k,8])
-
-        # (j) Nearest neighbour distance
-        qmj = _plot_cappi(
             grid, DIST_FIELD, height=height, scale=1.0e-3, cmap=CMAP_DIST,
-            norm=NORM_DIST, fig=fig, ax=axes[k,9])
+            norm=NORM_DIST, fig=fig, ax=axes[k,8])
 
     # Create colour bars
-    qm = [qma, qmb, qmc, qmd, qme, qmf, qmg, qmh, qmi, qmj]
+    qm = [qma, qmb, qmc, qmd, qme, qmf, qmg, qmh, qmi]
     _create_colorbars(fig, axes, qm, TICKS)
 
     # Format axes
@@ -208,6 +198,7 @@ def _plot_cappi(grid, field, height=0, scale=1.0, cmap=None, norm=None,
                 fig=None, ax=None):
     """
     """
+
     # Parse figure and axis
     if fig is None:
         fig = plt.gcf()
@@ -219,7 +210,7 @@ def _plot_cappi(grid, field, height=0, scale=1.0, cmap=None, norm=None,
     y = grid.variables['y'][:] / 1000.0
     z = grid.variables['z'][:] / 1000.0
 
-    # Parse field data
+    # Parse grid data
     data = scale * grid.variables[field][0,height,:,:]
 
     # Create quadmesh
@@ -244,7 +235,7 @@ def _create_colorbars(fig, axes, qm, ticks):
 
     for i in range(axes.shape[1]):
         parents = [ax for ax in axes[:,i].flat]
-        cax, kw = make_axes(parents, location='bottom', pad=0.03, shrink=1.0,
+        cax, _ = make_axes(parents, location='bottom', pad=0.03, shrink=1.0,
                            fraction=0.01, aspect=20)
         fig.colorbar(mappable=qm[i], cax=cax, orientation='horizontal',
                      ticks=ticks[i], drawedges=False, spacing='uniform')
@@ -277,7 +268,7 @@ if __name__ == '__main__':
              sorted(os.listdir(args.inpdir)) if args.stamp in f]
 
     if args.verbose:
-        print('Number of files to plot: {}'.format(len(files)))
+        print 'Number of files to plot: {}'.format(len(files))
 
     for filename in files:
 
@@ -291,3 +282,5 @@ if __name__ == '__main__':
         if args.verbose:
             elapsed = time.time() - start
             print('Elapsed time to save plot: {:.0f} sec'.format(elapsed))
+
+
